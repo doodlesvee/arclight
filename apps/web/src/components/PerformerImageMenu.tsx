@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ImagePlus, Loader2, Move, Pencil, Trash2 } from "lucide-react";
+import { Circle, ImagePlus, Loader2, Move, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   deletePerformerImage,
@@ -27,6 +27,7 @@ export function PerformerImageMenu({
   hasImage,
   canReposition,
   onReposition,
+  onRepositionCircle,
   onUploaded,
   className,
 }: {
@@ -36,6 +37,11 @@ export function PerformerImageMenu({
   hasImage: boolean;
   canReposition: boolean;
   onReposition: () => void;
+  /**
+   * When given, "Reposition" splits in two: the tiles and the round profile
+   * picture crop the same photo very differently, so each gets its own.
+   */
+  onRepositionCircle?: () => void;
   /**
    * Fired after a successful upload, so the caller can drop straight into
    * framing. A freshly uploaded picture is exactly when you know how you want
@@ -162,7 +168,19 @@ export function PerformerImageMenu({
                 onReposition();
               }}
             >
-              Reposition
+              {onRepositionCircle ? "Adjust for tiles" : "Reposition"}
+            </MenuItem>
+          )}
+
+          {canReposition && onRepositionCircle && (
+            <MenuItem
+              icon={<Circle className="size-4" />}
+              onClick={() => {
+                setOpen(false);
+                onRepositionCircle();
+              }}
+            >
+              Adjust for circle
             </MenuItem>
           )}
 

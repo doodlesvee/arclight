@@ -26,6 +26,7 @@ import {
   useAppearance,
   useAppearanceScope,
 } from "@/lib/appearance";
+import { PREVIEW_SCREENSAVER, SCREENSAVER_SOURCES } from "@/lib/screensaver";
 import { Slider, Toggle } from "./AppearanceControls";
 import { PrivacyUnlockForm } from "./PrivacyUnlockForm";
 import { Portal } from "./Portal";
@@ -70,6 +71,12 @@ export function AppearanceMenu() {
     hoverZoom,
     hoverPreview,
     modalPreview,
+    ambientLight,
+    screensaver,
+    screensaverMinutes,
+    screensaverSeconds,
+    screensaverSource,
+    screensaverClock,
     autoplayNext,
     motion,
     cardRadiusRem,
@@ -284,6 +291,18 @@ export function AppearanceMenu() {
               />
 
               <Toggle
+                label="Ambient light"
+                hint={
+                  discreet
+                    ? "Off while discreet mode is on — moving colour would give away what's playing."
+                    : "A soft glow around the player in the colours on screen. Not shown in cinema mode or the mini player."
+                }
+                checked={!discreet && ambientLight}
+                disabled={discreet}
+                onChange={(next) => set({ ambientLight: next })}
+              />
+
+              <Toggle
                 label="Autoplay next in queue"
                 hint="When a video ends, start the next queued one. With this off the queue still advances — the Up next card is there to take it."
                 checked={autoplayNext}
@@ -291,6 +310,67 @@ export function AppearanceMenu() {
               />
 
               <Section label="Interface" />
+
+              <Toggle
+                label="Poster screensaver"
+                hint="When the app sits idle, a slow slideshow of posters. Never over a video that's playing; any key or movement brings you back."
+                checked={screensaver}
+                onChange={(next) => set({ screensaver: next })}
+              />
+
+              {screensaver && (
+                <div className="space-y-3 rounded-md border border-border p-3">
+                  <label className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-medium">Start after</span>
+                    <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="number"
+                        min={1}
+                        max={60}
+                        step={1}
+                        value={screensaverMinutes}
+                        onChange={(e) => {
+                          const minutes = Math.round(Number(e.target.value));
+                          // Ignores the empty moment while you retype a number.
+                          if (Number.isFinite(minutes) && minutes >= 1) {
+                            set({ screensaverMinutes: Math.min(60, minutes) });
+                          }
+                        }}
+                        className="h-7 w-16 rounded-md border border-input bg-background px-2 text-right tabular-nums text-foreground"
+                      />
+                      {screensaverMinutes === 1 ? "minute" : "minutes"} idle
+                    </span>
+                  </label>
+                  <ChoiceRow
+                    label="Show"
+                    options={SCREENSAVER_SOURCES}
+                    value={screensaverSource}
+                    onChange={(value) => set({ screensaverSource: value })}
+                  />
+                  <ChoiceRow
+                    label="Each poster"
+                    options={[5, 8, 15].map((s) => ({ value: s, label: `${s} s` }))}
+                    value={screensaverSeconds}
+                    onChange={(value) => set({ screensaverSeconds: value })}
+                  />
+                  <Toggle
+                    label="Show clock"
+                    hint="The time and date in the corner."
+                    checked={screensaverClock}
+                    onChange={(next) => set({ screensaverClock: next })}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false);
+                      window.dispatchEvent(new Event(PREVIEW_SCREENSAVER));
+                    }}
+                    className="w-full rounded-md bg-secondary px-3 py-1.5 text-xs font-medium hover:bg-accent"
+                  >
+                    Preview
+                  </button>
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <span className="text-xs font-medium">Animation</span>
@@ -617,5 +697,42 @@ function Section({ label }: { label: string }) {
     <h3 className="border-t border-border pt-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground first:border-0 first:pt-0">
       {label}
     </h3>
+  );
+}
+
+/** A labelled row of mutually exclusive options, in the panel's segmented style. */
+function ChoiceRow<T extends string | number>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <span className="text-xs font-medium">{label}</span>
+      <div className="flex gap-1 rounded-md bg-secondary/60 p-0.5">
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            aria-pressed={value === option.value}
+            className={cn(
+              "flex-1 rounded px-1.5 py-1 text-xs transition-colors",
+              value === option.value
+                ? "bg-background font-medium text-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   mediaItemTags,
   mediaItemTypes,
   playbackStates,
+  watchLog,
 } from "../db/schema.js";
 import { deleteItemThumbnail } from "../media/itemThumbnails.js";
 import { posterPathFor } from "../media/poster.js";
@@ -149,6 +150,7 @@ export async function deleteItems(targets: number[]): Promise<number> {
       .delete(playbackStates)
       .where(inArray(playbackStates.mediaItemId, targets));
     await tx.delete(bookmarks).where(inArray(bookmarks.mediaItemId, targets));
+    await tx.delete(watchLog).where(inArray(watchLog.mediaItemId, targets));
     await tx
       .delete(collectionItems)
       .where(inArray(collectionItems.mediaItemId, targets));

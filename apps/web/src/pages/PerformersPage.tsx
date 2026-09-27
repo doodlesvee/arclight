@@ -1,16 +1,58 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
-import { Heart } from "lucide-react";
+import { getRouteApi, useNavigate } from "@tanstack/react-router";
+import { Heart, LayoutGrid, Share2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import {
   PerformerCard,
   type PerformerSummary,
 } from "@/components/PerformerCard";
 import { AlphabetIndex } from "@/components/AlphabetIndex";
+import { PerformerNetwork } from "@/components/PerformerNetwork";
 import { pinsChangedEvent, readPins } from "@/lib/pinned";
 import { tileWidthPx, useAppearance, PageScope } from "@/lib/appearance";
 import { cardLayout } from "@/lib/layout";
+import { cn } from "@/lib/utils";
+
+const routeApi = getRouteApi("/performers");
+
+/** Grid of cards, or the graph of who appears with whom. */
+function ViewSwitch({ network }: { network: boolean }) {
+  const navigate = useNavigate();
+  const options = [
+    { key: "grid", label: "Grid", icon: LayoutGrid, active: !network },
+    { key: "network", label: "Network", icon: Share2, active: network },
+  ] as const;
+  return (
+    <div className="flex rounded-md bg-secondary p-0.5" role="group" aria-label="View">
+      {options.map(({ key, label, icon: Icon, active }) => (
+        <button
+          key={key}
+          type="button"
+          title={label}
+          aria-pressed={active}
+          onClick={() =>
+            void navigate({
+              to: "/performers",
+              search: key === "network" ? { view: "network" } : {},
+            })
+          }
+          className={cn(
+            "flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors",
+            active
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <Icon className="size-3.5" />
+          {/* Icons alone on a phone, where the header also has to fit the
+              page title. */}
+          <span className="sr-only sm:not-sr-only">{label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /**
  * One section of the page.
@@ -53,6 +95,8 @@ async function fetchJson<T>(url: string): Promise<T> {
 
 export function PerformersPage() {
   const navigate = useNavigate();
+  const search = routeApi.useSearch();
+  const network = search.view === "network";
   const { tileSizePercent, tileInfo, viewMode, tileShape, density } = useAppearance();
   // The same axes the media grid uses, so a layout choice made once applies
   // here too rather than only to videos. The shape is passed for the gaps and
@@ -131,7 +175,24 @@ export function PerformersPage() {
             ? `${performers.length} ${performers.length === 1 ? "performer" : "performers"}`
             : undefined
         }
+        actions={<ViewSwitch network={network} />}
       >
+        {network ? (
+          <div className="px-4 py-6 md:px-6 md:py-8">
+            <PerformerNetwork
+              view={search}
+              // Replacing rather than pushing: every hide, filter or drag of
+              // the year slider would otherwise be its own back-button stop.
+              onViewChange={(patch) =>
+                void navigate({
+                  to: "/performers",
+                  search: (prev) => ({ ...prev, ...patch, view: "network" }),
+                  replace: true,
+                })
+              }
+            />
+          </div>
+        ) : (
         <div className="space-y-8 px-4 py-6 md:px-6 md:py-8">
           <AlphabetIndex
             value={letter}
@@ -184,6 +245,7 @@ export function PerformersPage() {
             </section>
           )}
         </div>
+        )}
       </AppShell>
     </PageScope>
   );

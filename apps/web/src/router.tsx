@@ -15,9 +15,11 @@ import { PerformerPage } from "@/pages/PerformerPage";
 import { PerformersPage } from "@/pages/PerformersPage";
 import { StudioPage } from "@/pages/StudioPage";
 import { StudiosPage } from "@/pages/StudiosPage";
+import { StatsPage } from "@/pages/StatsPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { SeriesPage } from "@/pages/SeriesPage";
 import { SeriesPageIndex } from "@/pages/SeriesPageIndex";
+import type { NetworkView } from "@/lib/performerApi";
 
 const rootRoute = createRootRoute();
 
@@ -109,7 +111,31 @@ const performerRoute = createRoute({
 const performersRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/performers",
+  // In the URL rather than state, so the network view survives a reload and
+  // the back button returns to it from a profile opened there.
+  validateSearch: (search: Record<string, unknown>): { view?: "network" } & NetworkView => {
+    const int = (value: unknown) =>
+      value != null && Number.isInteger(Number(value)) ? Number(value) : undefined;
+    const text = (value: unknown) => (typeof value === "string" && value ? value : undefined);
+    return {
+      view: search.view === "network" ? "network" : undefined,
+      // What the network links performers by; absent means shared videos.
+      // Studios is the default, so only "videos" needs saying.
+      by: search.by === "videos" ? "videos" : undefined,
+      focus: int(search.focus),
+      depth: int(search.depth) === 2 ? 2 : undefined,
+      hidden: text(search.hidden),
+      studios: int(search.studios) === 1 ? 1 : undefined,
+      path: text(search.path),
+    };
+  },
   component: PerformersPage,
+});
+
+const statsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/stats",
+  component: StatsPage,
 });
 
 const albumsRoute = createRoute({
@@ -187,6 +213,7 @@ const routeTree = rootRoute.addChildren([
   browseRoute,
   performerRoute,
   performersRoute,
+  statsRoute,
   albumsRoute,
   seriesIndexRoute,
   seriesRoute,

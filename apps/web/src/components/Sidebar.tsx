@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
+  BarChart3,
   Bookmark,
   Clapperboard,
   FolderOpen,
@@ -301,6 +302,7 @@ export function Sidebar({
           {!collapsed && "Series"}
         </Link>
 
+
         {/* Collections and tags are text-only — collapsed they'd be a column of
             identical, unreadable icons, so the lists hide entirely. The create
             action stays, since it's the one thing that isn't recoverable by
@@ -536,6 +538,17 @@ export function Sidebar({
           {!collapsed && health && health.videoMissing > 0 && (
             <Lock className="size-3 shrink-0 text-muted-foreground/60" />
           )}
+        </Link>
+        {/* A page you come to browse, so it sits with the other destinations
+            here rather than behind the account menu. */}
+        <Link
+          to="/stats"
+          className={cn(navItemClass, "mb-1")}
+          title={collapsed ? "Your stats" : undefined}
+          activeProps={{ className: "bg-accent text-foreground font-medium" }}
+        >
+          <BarChart3 className="size-4 shrink-0" />
+          {!collapsed && "Your stats"}
         </Link>
         <Link
           to="/settings"

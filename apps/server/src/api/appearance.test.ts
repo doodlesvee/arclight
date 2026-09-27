@@ -45,6 +45,38 @@ describe("appearance settings", () => {
     expect(await load()).toMatchObject({ modalPreview: false });
   });
 
+  it("stores the ambient light preference", async () => {
+    await save({ ambientLight: false });
+    expect(await load()).toMatchObject({ ambientLight: false });
+  });
+
+  it("stores the screensaver preference", async () => {
+    await save({ screensaver: false });
+    expect(await load()).toMatchObject({ screensaver: false });
+  });
+
+  it("stores the pinned main event, and 0 to unpin it", async () => {
+    await save({ hallOfFamePin: 1472 });
+    expect(await load()).toMatchObject({ hallOfFamePin: 1472 });
+    await save({ hallOfFamePin: 0 });
+    expect(await load()).toMatchObject({ hallOfFamePin: 0 });
+  });
+
+  it("stores the screensaver's settings, keeping them in range", async () => {
+    await save({
+      screensaverMinutes: 500,
+      screensaverSeconds: 8,
+      screensaverSource: "favourites",
+      screensaverClock: false,
+    });
+    expect(await load()).toMatchObject({
+      screensaverMinutes: 60,
+      screensaverSeconds: 8,
+      screensaverSource: "favourites",
+      screensaverClock: false,
+    });
+  });
+
   it("clamps a height to the range the slider offers", async () => {
     await save({ heroHeight: 5000, bannerHeight: -20 });
     expect(await load()).toMatchObject({ heroHeight: 100, bannerHeight: 30 });

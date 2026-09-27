@@ -3,6 +3,7 @@ import {
   bigint,
   boolean,
   date,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -218,6 +219,13 @@ export const performers = pgTable(
     imagePositionX: integer("image_position_x").notNull().default(50),
     imagePositionY: integer("image_position_y").notNull().default(0),
     imageScale: integer("image_scale").notNull().default(100),
+    // Separate framing for the round crops (the profile picture, the
+    // network graph), which cut far more from a 2:3 portrait than the tiles
+    // do. Null until set, and a null falls back to the tile framing above,
+    // so nothing changes for a performer until their circle is adjusted.
+    avatarPositionX: integer("avatar_position_x"),
+    avatarPositionY: integer("avatar_position_y"),
+    avatarScale: integer("avatar_scale"),
     bannerFile: text("banner_file"),
     // Which horizontal band of the banner image is visible, as a percentage
     // for CSS object-position. The image is stored uncropped so this stays
@@ -430,6 +438,35 @@ export const playbackStates = pgTable("playback_states", {
  * being moved or renamed — the scanner re-matches it to the same item by
  * content hash, and everything hanging off the item comes along.
  */
+/**
+ * How long you watched each video, hour by hour.
+ *
+ * `playback_states` holds one row per video — where you got to, when you
+ * last finished it — so it can say what you've watched but not when. This is
+ * the when: the calendar, streaks and monthly recap are all sums over it.
+ *
+ * Hour buckets rather than one row per play or per progress report: small
+ * enough to stay a few thousand rows a year, fine enough that each viewer's
+ * own clock can place them in the right day and evening. Stored in UTC; the
+ * client converts to local time.
+ */
+export const watchLog = pgTable(
+  "watch_log",
+  {
+    id: serial("id").primaryKey(),
+    mediaItemId: integer("media_item_id")
+      .notNull()
+      .references(() => mediaItems.id),
+    /** The start of the UTC hour this time was watched in. */
+    hour: timestamp("hour", { withTimezone: true }).notNull(),
+    seconds: integer("seconds").notNull().default(0),
+  },
+  (table) => [
+    uniqueIndex("watch_log_item_hour_idx").on(table.mediaItemId, table.hour),
+    index("watch_log_hour_idx").on(table.hour),
+  ],
+);
+
 export const bookmarks = pgTable("bookmarks", {
   id: serial("id").primaryKey(),
   mediaItemId: integer("media_item_id")

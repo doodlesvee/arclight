@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { BarChart3, ChevronRight, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import {
   SettingsFeedback,
@@ -136,10 +137,36 @@ function PasswordSection() {
   );
 }
 
+/** Your profile: who you are, a way into your stats, and your sign-in details. */
 export function AccountPage() {
+  const { data: auth } = useQuery({ queryKey: ["auth-status"], queryFn: fetchAuthStatus });
+  const name = auth?.user?.username ?? "";
+
   return (
-    <AppShell title="Account" subtitle="Your sign-in details.">
-      <div className="stagger space-y-5 px-4 py-6 md:px-6 md:py-8">
+    <AppShell>
+      <div className="stagger mx-auto w-full max-w-2xl space-y-5 px-4 py-6 md:px-6 md:py-8">
+        <div className="flex items-center gap-4">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-secondary text-lg font-semibold ring-1 ring-border">
+            {name.charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <h1 className="sensitive truncate text-xl font-bold tracking-tight">{name}</h1>
+            <p className="text-sm text-muted-foreground">Profile</p>
+          </div>
+        </div>
+
+        <Link
+          to="/stats"
+          className="group flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:bg-secondary/40"
+        >
+          <BarChart3 className="size-5 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium">Your stats</span>
+            <span className="block text-xs text-muted-foreground">Hours watched, streaks and your year in review</span>
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+        </Link>
+
         <UsernameSection />
         <PasswordSection />
       </div>

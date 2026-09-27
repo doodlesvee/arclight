@@ -1,7 +1,10 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { resetDatabase, signIn, testApp } from "../test/harness.js";
+import { eq } from "drizzle-orm";
 import { SORTS } from "./mediaItems.js";
+import { db } from "../db/client.js";
+import { performers } from "../db/schema.js";
 import {
   attachFile,
   linkPerformer,
@@ -433,6 +436,20 @@ describe("GET /api/search/suggestions", () => {
     const body = (await get("/api/search/suggestions?q=black")).json();
     expect(body.performers[0]).toMatchObject({ videoCount: 1 });
     expect(body.items[0].performers[0].name).toBe("Tori Black");
+  });
+});
+
+describe("GET /api/search/suggestions framing", () => {
+  it("carries each performer's round-crop framing, so avatars match everywhere else", async () => {
+    const performerId = await makePerformer("Tori Black");
+    await db
+      .update(performers)
+      .set({ avatarPositionX: 30, avatarPositionY: 40, avatarScale: 150 })
+      .where(eq(performers.id, performerId));
+    await linkPerformer(await makeItem(libraryId, { title: "Black Tie" }), performerId);
+
+    const body = (await get("/api/search/suggestions?q=black")).json();
+    expect(body.performers[0]).toMatchObject({ avatarPositionX: 30, avatarPositionY: 40, avatarScale: 150 });
   });
 });
 

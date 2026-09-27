@@ -22,10 +22,23 @@ import { users, webauthnCredentials } from "../db/schema.js";
  * network by IP would not, and the browser would simply refuse.
  */
 
-// Where the browser thinks it is. Both must match what's in the address bar
-// or the browser rejects the ceremony before the server ever sees it.
-const ORIGIN = process.env.WEBAUTHN_ORIGIN ?? "http://localhost:5173";
-const RP_ID = new URL(ORIGIN).hostname;
+// Where the browser thinks it is: a comma-separated list, because dev (Vite on
+// 5173) and production (the server itself on 3000) are different origins, and
+// the server rejects a response signed on any origin not listed here.
+//
+// The RP ID is hostname only — no port — so one credential registered under
+// `localhost` works on every port. That also means every listed origin must
+// share a hostname; the browser refuses the ceremony outright when the RP ID
+// doesn't match the address bar.
+export function parseOrigins(value: string | undefined): { origins: string[]; rpId: string } {
+  const origins = (value ?? "http://localhost:5173,http://localhost:3000")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  return { origins, rpId: new URL(origins[0]).hostname };
+}
+
+const { origins: ORIGINS, rpId: RP_ID } = parseOrigins(process.env.WEBAUTHN_ORIGIN);
 const RP_NAME = "Media Server";
 
 /**
@@ -113,7 +126,7 @@ export async function webauthnRoutes(app: FastifyInstance): Promise<void> {
           // The library validates the shape; a malformed body throws below.
           response: request.body?.response as never,
           expectedChallenge: expected,
-          expectedOrigin: ORIGIN,
+          expectedOrigin: ORIGINS,
           expectedRPID: RP_ID,
           requireUserVerification: true,
         });
@@ -207,7 +220,7 @@ export async function webauthnRoutes(app: FastifyInstance): Promise<void> {
         verification = await verifyAuthenticationResponse({
           response: request.body?.response as never,
           expectedChallenge: expected,
-          expectedOrigin: ORIGIN,
+          expectedOrigin: ORIGINS,
           expectedRPID: RP_ID,
           requireUserVerification: true,
           credential: {

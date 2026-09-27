@@ -50,6 +50,8 @@ export type FramingEditorProps = {
    * focal-point mode; leaving it out keeps the single-frame drag.
    */
   previews?: FramingPreview[];
+  /** Preview through a circle, for images that are shown round. */
+  round?: boolean;
 };
 
 /**
@@ -74,6 +76,7 @@ function ClassicFraming({
   onSave,
   onCancel,
   note,
+  round = false,
 }: FramingEditorProps) {
   const [draft, setDraft] = useState<Framing>({ x: value.x, y: value.y });
   const [scale, setScale] = useState(value.scale);
@@ -170,7 +173,10 @@ function ClassicFraming({
       <div
         ref={containerRef}
         className={cn(
-          "relative w-full max-w-sm overflow-hidden rounded-md ring-1 ring-border",
+          "relative w-full overflow-hidden ring-1 ring-border",
+          // A circle as wide as the tile preview would dwarf the page, and
+          // what it previews is a profile picture a fraction of that size.
+          round ? "max-w-[15rem] rounded-full" : "max-w-sm rounded-md",
           !aspectRatio && aspectClass
         )}
         style={aspectRatio ? { aspectRatio } : undefined}

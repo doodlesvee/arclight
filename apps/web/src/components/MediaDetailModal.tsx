@@ -11,6 +11,8 @@ import {
   Gauge,
   GripHorizontal,
   Heart,
+  Lightbulb,
+  Trophy,
   Maximize,
   PictureInPicture2,
   Maximize2,
@@ -26,6 +28,7 @@ import {
   X,
 } from "lucide-react";
 import { PerformerEditor } from "./PerformerEditor";
+import { AmbientLight } from "./AmbientLight";
 import { ClampedText } from "./ClampedText";
 import { DescriptionEditor } from "./DescriptionEditor";
 import { EditableTitle } from "./EditableTitle";
@@ -172,10 +175,21 @@ export function MediaDetailModal({
     queryFn: () => fetchItem(viewingId),
   });
 
-  const { discreet, modalPreview, autoplayNext, density, heroHeight } =
-    useAppearance();
+  const {
+    discreet,
+    modalPreview,
+    autoplayNext,
+    density,
+    heroHeight,
+    ambientLight: ambient,
+    hallOfFamePin,
+    set: setAppearance,
+  } = useAppearance();
+  // The player's own button flips the same Appearance setting.
+  const toggleAmbient = () => setAppearance({ ambientLight: !ambient });
   const runUndoable = useUndoable();
   const [mode, setMode] = useState<"preview" | "playing">("preview");
+
   // Opened, but holding the still with nothing running. Only ever true before
   // real playback starts: once you press Play the mode changes and neither
   // discreet mode nor the preview preference gets a say in it.
@@ -890,6 +904,14 @@ export function MediaDetailModal({
         )}
         onClick={onClose}
       >
+        {/* Behind the dialog, on the dimmed backdrop. Not in cinema mode,
+            where the video already fills the screen; not in the mini player,
+            which has no backdrop; and not in discreet mode, where colour
+            moving across the room gives away what's playing. */}
+        <AmbientLight
+          videoRef={videoRef}
+          active={ambient && isVideo && mode === "playing" && !mini && !cinema && !discreet}
+        />
         <div
           ref={panelRef}
           tabIndex={-1}
@@ -1202,6 +1224,33 @@ export function MediaDetailModal({
                       >
                         <ListPlus className="size-4 sm:size-5" />
                       </button>
+                      {/* Makes this the Hall of fame's headline ("#1 of all time") on the
+                          Stats page, in place of the automatic pick. */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAppearance({ hallOfFamePin: hallOfFamePin === item.id ? 0 : item.id })
+                        }
+                        aria-pressed={hallOfFamePin === item.id}
+                        aria-label={
+                          hallOfFamePin === item.id
+                            ? "Unpin from Hall of fame"
+                            : "Pin to Hall of fame"
+                        }
+                        title={
+                          hallOfFamePin === item.id
+                            ? "Your #1 of all time — click to unpin from Hall of fame"
+                            : "Pin to Hall of fame as your #1 of all time"
+                        }
+                        className="flex size-8 shrink-0 items-center justify-center rounded-full border border-white/40 backdrop-blur-sm transition-colors hover:border-white sm:size-10"
+                      >
+                        <Trophy
+                          className={cn(
+                            "size-4 transition-colors sm:size-5",
+                            hallOfFamePin === item.id && "fill-amber-400 text-amber-400",
+                          )}
+                        />
+                      </button>
                       <button
                         type="button"
                         onClick={() => queueCurrent(true)}
@@ -1350,6 +1399,21 @@ export function MediaDetailModal({
                     className="flex size-9 items-center justify-center rounded-full bg-black/60 backdrop-blur-sm transition-colors hover:bg-black/80"
                   >
                     <PictureInPicture2 className="size-4" />
+                  </button>
+                )}
+                {!mini && !cinema && !discreet && (
+                  <button
+                    type="button"
+                    onClick={toggleAmbient}
+                    aria-pressed={ambient}
+                    aria-label="Ambient light"
+                    title={ambient ? "Turn off ambient light" : "Turn on ambient light"}
+                    className={cn(
+                      "flex size-9 items-center justify-center rounded-full backdrop-blur-sm transition-colors",
+                      ambient ? "bg-white/25 hover:bg-white/35" : "bg-black/60 hover:bg-black/80",
+                    )}
+                  >
+                    <Lightbulb className={cn("size-4", ambient && "fill-current")} />
                   </button>
                 )}
                 {!mini && (

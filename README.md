@@ -37,7 +37,11 @@ does differently:
   a studio, add or remove a performer, or file them into a collection
 - **Groups** by performer, studio, album and series, each with its own
   browsable page
-- **Tracks** watch progress, play counts and a watched state
+- **Tracks** watch progress, play counts and a watched state, plus an
+  hour-by-hour watch log that powers [Your stats](#your-stats)
+- **Maps who works with whom** — Performers → Network draws a graph linking
+  performers by the videos they share or the studios they have in common,
+  with focus, hide and shortest-path tools
 - **Previews the seek bar**: hover or drag along it to see the frame you're
   about to jump to, and bookmark moments inside a video to come back to
 - **Sorts** by date added, release date, title (A–Z or Z–A) and more, and
@@ -45,6 +49,9 @@ does differently:
 - **Works on a phone** over your wifi — a drawer sidebar, swipeable hero and
   touch-sized controls; see [Using it from a phone](#using-it-from-a-phone)
 - **Hides itself** on a keypress — see [Discreet mode](#discreet-mode)
+- **Glows and idles**: an optional ambient light behind the player picks up
+  the colours on screen, and an optional poster screensaver drifts through
+  your library after a few idle minutes (never over a playing video)
 - **Adapts** to how you like it drawn, without a rebuild — see
   [Appearance](#appearance)
 - **Casts** to a Chromecast or smart TV from Chrome, or AirPlay from Safari —
@@ -204,7 +211,7 @@ on the host.
 | `HOME_ROOT` | What the in-app folder browser may look at, read-only | `/Users` |
 | `BACKUP_DIR` | The one writable mount. Backups are written here, and anything you drop in is offered for restore | `../backups` |
 | `COMPOSE_FILE` | Which compose files a bare `docker compose` picks up | — |
-| `WEBAUTHN_ORIGIN` | Where the browser thinks it is, for Touch ID | `http://localhost:5173` |
+| `WEBAUTHN_ORIGIN` | Where the browser thinks it is, for Touch ID. Comma-separated; all must share a hostname | `http://localhost:5173,http://localhost:3000` |
 | `LAN_HOST` | This machine's address on the wifi, so Settings can show the URL to open on a phone. Detected automatically by the npm scripts; set it to override | detected |
 | `LAN_PORT` | The port that URL uses — the one a phone actually opens | `5173` in dev, `3000` in production |
 
@@ -317,6 +324,34 @@ docker compose restart app web
 Migrations are generated with `npm run db:generate -w apps/server` and applied
 automatically on boot.
 
+### Tests
+
+The web tests are self-contained: `npm test -w apps/web`.
+
+The server tests are integration tests against a real Postgres, and some of
+them clear and rewrite folders under `APP_DATA_DIR`. **Never run them inside
+the running `app` container** — its `APP_DATA_DIR` is your real `app-data`
+volume, and a run there deletes uploaded performer photos and generated
+artwork. Run them against a throwaway database and a scratch data folder
+instead:
+
+```bash
+docker run -d --rm --name media-test-pg -p 55432:5432 \
+  -e POSTGRES_USER=media -e POSTGRES_PASSWORD=media -e POSTGRES_DB=media \
+  postgres:17-alpine
+
+APP_DATA_DIR=$(mktemp -d) \
+TEST_ADMIN_URL=postgres://media:media@localhost:55432/media \
+TEST_DATABASE_URL=postgres://media:media@localhost:55432/media_test \
+  npm test -w apps/server
+
+docker stop media-test-pg
+```
+
+The video tests need `ffmpeg` on the machine running them; without it on the
+host, run the same command in a disposable container from the app image with
+none of the real volumes mounted.
+
 ## Naming
 
 The scanner reads two things: **where a file is** and **what it's called**.
@@ -416,6 +451,35 @@ instead of flashing the defaults.
 
 Which sections the homepage has, and in what order, lives under Site settings →
 Homepage — it's a layout decision made once, not a slider.
+
+Ambient light and the poster screensaver are here too. The screensaver's idle
+time, how long each poster stays up, what it shows (everything, favourites,
+unwatched or 4★ and up) and whether it shows a clock are all set in the same
+panel.
+
+A performer's round avatar can be framed separately from their portrait tile,
+since a face that fits a 2:3 card is often off-centre in a circle; a circle
+that has never been adjusted keeps using the tile's framing.
+
+## Your stats
+
+*Your stats*, at the bottom of the sidebar (and linked from Profile), looks
+back on your watching as a year in review:
+
+- **Opening** — total hours watched, with streaks, active days and your
+  average day
+- **01 The podium** — your #1 video (pin one yourself, or it picks your most
+  watched), a performer podium, and ranked lists by plays and rating
+- **02 Your year** — hours per month; click a month for a written recap of it
+  (time, top performer and studio, busiest day, what you had on repeat), and
+  the last twelve months as GitHub-style calendars, one block per month
+- **03 Your habits** — the hours and weekdays you watch most
+- **04 Trophies** — achievements unlocked and still to unlock
+
+It is built from the watch log, which records how long you watched each video
+in hour-sized buckets. Only time watched since the log was added counts, so a
+fresh install — or a month you haven't watched in yet — starts quiet and fills
+in as you use it.
 
 ## Smart collections
 

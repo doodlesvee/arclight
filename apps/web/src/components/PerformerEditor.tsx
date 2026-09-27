@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { X } from "lucide-react";
 import { savePerformers, type Performer } from "@/lib/mediaItemApi";
-import { performerPortraitUrl, portraitStyle } from "@/lib/performerApi";
+import { circleStyle, performerPortraitUrl } from "@/lib/performerApi";
 import { PerformerAvatar } from "./PerformerAvatar";
 import type { PerformerSummary } from "./PerformerCard";
 
@@ -95,7 +95,7 @@ export function PerformerEditor({
                 <PerformerAvatar
                   name={name}
                   src={summary ? performerPortraitUrl(summary) : null}
-                  framing={summary ? portraitStyle(summary) : undefined}
+                  framing={summary ? circleStyle(summary) : undefined}
                   className="aspect-square w-20 transition-all duration-200 group-hover:ring-2 group-hover:ring-white/50"
                   fallbackClassName="text-xl"
                 />

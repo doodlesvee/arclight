@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { SCREENSAVER_SOURCES, type ScreensaverSource } from "./screensaver";
 import { fetchAppearance, saveAppearance } from "./appearanceApi";
 import {
   DENSITIES,
@@ -261,6 +262,24 @@ export type Appearance = {
    * hero's Play button, is explicit intent and ignores this.
    */
   modalPreview: boolean;
+  /**
+   * A soft glow behind the player in the colours on screen, like an
+   * Ambilight TV. Never shown in cinema mode, the mini player or discreet
+   * mode, whatever this says.
+   */
+  ambientLight: boolean;
+  /** A slideshow of posters after some idle minutes; never over playback. */
+  screensaver: boolean;
+  /** Idle minutes before the screensaver starts. */
+  screensaverMinutes: number;
+  /** Seconds each poster stays on screen. */
+  screensaverSeconds: number;
+  /** Which videos' posters it shows. */
+  screensaverSource: ScreensaverSource;
+  /** The time and date in the corner. */
+  screensaverClock: boolean;
+  /** The video pinned as the Hall of fame's main event; 0 lets it pick. */
+  hallOfFamePin: number;
   /** Blur every image and clip in the app until you hover one. */
   discreet: boolean;
   /**
@@ -386,6 +405,13 @@ export const DEFAULTS: Appearance = {
   hoverZoom: true,
   hoverPreview: true,
   modalPreview: true,
+  ambientLight: true,
+  screensaver: true,
+  screensaverMinutes: 5,
+  screensaverSeconds: 8,
+  screensaverSource: "all",
+  screensaverClock: true,
+  hallOfFamePin: 0,
   discreet: false,
   // 45% ≈ the 18px this was fixed at before the slider existed.
   discreetBlurPercent: 45,
@@ -492,6 +518,26 @@ function read(): Appearance {
         typeof parsed.modalPreview === "boolean"
           ? parsed.modalPreview
           : DEFAULTS.modalPreview,
+      ambientLight:
+        typeof parsed.ambientLight === "boolean"
+          ? parsed.ambientLight
+          : DEFAULTS.ambientLight,
+      screensaver:
+        typeof parsed.screensaver === "boolean"
+          ? parsed.screensaver
+          : DEFAULTS.screensaver,
+      screensaverMinutes: clampRange(parsed.screensaverMinutes, 1, 60, DEFAULTS.screensaverMinutes),
+      screensaverSeconds: clampRange(parsed.screensaverSeconds, 3, 60, DEFAULTS.screensaverSeconds),
+      screensaverSource: SCREENSAVER_SOURCES.some((o) => o.value === parsed.screensaverSource)
+        ? (parsed.screensaverSource as ScreensaverSource)
+        : DEFAULTS.screensaverSource,
+      screensaverClock:
+        typeof parsed.screensaverClock === "boolean"
+          ? parsed.screensaverClock
+          : DEFAULTS.screensaverClock,
+      hallOfFamePin: Number.isInteger(parsed.hallOfFamePin)
+        ? clampRange(parsed.hallOfFamePin, 0, 2147483647, 0)
+        : DEFAULTS.hallOfFamePin,
       discreet:
         typeof parsed.discreet === "boolean"
           ? parsed.discreet

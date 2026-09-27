@@ -1,7 +1,30 @@
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { db } from "../db/client.js";
-import { playbackStates } from "../db/schema.js";
+import { playbackStates, watchLog } from "../db/schema.js";
+
+/**
+ * How much of a progress report counts as watching.
+ *
+ * The player reports its position every few seconds. The distance moved
+ * since the last report is time watched — but only when it's no more than
+ * the time that actually passed, give or take, so a seek forward isn't
+ * counted as having watched what it skipped. Going backwards counts nothing,
+ * and so does a report arriving long after the last (a tab left open).
+ */
+export function secondsWatched(
+  previous: { positionSeconds: number; updatedAt: Date } | undefined,
+  positionSeconds: number,
+  now: Date,
+): number {
+  if (!previous) return 0;
+  const moved = positionSeconds - previous.positionSeconds;
+  const elapsed = (now.getTime() - previous.updatedAt.getTime()) / 1000;
+  if (moved <= 0 || elapsed <= 0 || elapsed > 120) return 0;
+  // Slack for playback running at 2× and for reports arriving a little late.
+  if (moved > elapsed * 2 + 3) return 0;
+  return Math.round(moved);
+}
 
 export async function playbackRoutes(app: FastifyInstance): Promise<void> {
   app.put<{ Params: { id: string }; Body: { positionSeconds: number } }>(
@@ -15,13 +38,41 @@ export async function playbackRoutes(app: FastifyInstance): Promise<void> {
         return { error: "positionSeconds must be a non-negative number" };
       }
 
+      const now = new Date();
+      const [previous] = await db
+        .select({
+          positionSeconds: playbackStates.positionSeconds,
+          updatedAt: playbackStates.updatedAt,
+        })
+        .from(playbackStates)
+        .where(eq(playbackStates.mediaItemId, mediaItemId));
+
       await db
         .insert(playbackStates)
         .values({ mediaItemId, positionSeconds })
         .onConflictDoUpdate({
           target: playbackStates.mediaItemId,
-          set: { positionSeconds, updatedAt: new Date() },
+          set: { positionSeconds, updatedAt: now },
         });
+
+      // The watch log is a bonus on top of saving your place: if it fails,
+      // the position above is already saved and the request still succeeds.
+      const watched = secondsWatched(previous, positionSeconds, now);
+      if (watched > 0) {
+        const hour = new Date(now);
+        hour.setUTCMinutes(0, 0, 0);
+        try {
+          await db
+            .insert(watchLog)
+            .values({ mediaItemId, hour, seconds: watched })
+            .onConflictDoUpdate({
+              target: [watchLog.mediaItemId, watchLog.hour],
+              set: { seconds: sql`${watchLog.seconds} + ${watched}` },
+            });
+        } catch (error) {
+          request.log.warn({ error }, "watch log: could not record");
+        }
+      }
 
       return { ok: true };
     }

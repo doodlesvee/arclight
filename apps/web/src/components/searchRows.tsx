@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { framingStyle, thumbnailUrl } from "@/lib/mediaItemApi";
-import { performerPortraitUrl, portraitStyle } from "@/lib/performerApi";
+import { circleStyle, performerPortraitUrl } from "@/lib/performerApi";
 
 /**
  * The shared half of search: what a suggestion is, how it's fetched, and how
@@ -19,6 +19,9 @@ export type PerformerHit = {
   hasBanner: boolean;
   representativeItemId: number | null;
   imagePositionX: number;
+  avatarPositionX?: number | null;
+  avatarPositionY?: number | null;
+  avatarScale?: number | null;
   imagePositionY: number;
   imageScale: number;
   videoCount: number;
@@ -65,7 +68,7 @@ export function PerformerRowContent({ performer }: { performer: PerformerHit }) 
           <img
             src={portrait}
             alt=""
-            style={portraitStyle(performer)}
+            style={circleStyle(performer)}
             className="h-full w-full object-cover"
           />
         ) : (

@@ -34,6 +34,9 @@ const BOOLEAN_KEYS = [
   "discreet",
   "discreetText",
   "autoplayNext",
+  "ambientLight",
+  "screensaver",
+  "screensaverClock",
 ] as const;
 
 /**
@@ -46,6 +49,11 @@ const BOOLEAN_KEYS = [
 const NUMBER_KEYS = {
   cardRadiusRem: [0, 1.5],
   typeScale: [0.85, 1.3],
+  // Minutes idle before it starts, and seconds each poster stays up.
+  screensaverMinutes: [1, 60],
+  screensaverSeconds: [3, 60],
+  // The video pinned as the Hall of fame's main event; 0 means "pick for me".
+  hallOfFamePin: [0, 2147483647],
 } as const;
 
 /**
@@ -61,6 +69,7 @@ const ENUM_KEYS: Record<string, string[]> = {
   tileShape: ["landscape", "portrait"],
   density: ["spacious", "comfortable", "compact", "dense"],
   motion: ["full", "reduced", "none"],
+  screensaverSource: ["all", "favourites", "unwatched", "topRated"],
 };
 
 /** The layout settings a single page may pin for itself. */

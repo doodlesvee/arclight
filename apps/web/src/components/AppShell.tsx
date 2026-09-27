@@ -4,6 +4,7 @@ import { ArrowLeft, Menu, Search, X } from "lucide-react";
 import { SEARCH_SHORTCUT } from "@/lib/appearance";
 import { useIsMobile } from "@/lib/useMediaQuery";
 import { AppearanceMenu } from "./AppearanceMenu";
+import { Screensaver } from "./Screensaver";
 import { DiscreetUnlockDialog } from "./DiscreetUnlockDialog";
 import { SpotlightSearch, openSpotlight } from "./SpotlightSearch";
 import { AppFooter } from "./AppFooter";
@@ -283,6 +284,7 @@ export function AppShell({
           and it portals itself, so it only needs to exist somewhere that's on
           every page. */}
       <AppearanceMenu />
+      <Screensaver />
       <DiscreetUnlockDialog />
       <SpotlightSearch />
     </div>

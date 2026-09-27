@@ -19,7 +19,9 @@ import {
   fetchPerformer,
   performerBannerUrl,
   performerPortraitUrl,
-  portraitStyle,
+  circleFraming,
+  circleStyle,
+  saveCircleFraming,
   savePortraitFraming,
   setPerformerFavorite,
 } from "@/lib/performerApi";
@@ -29,7 +31,8 @@ const routeApi = getRouteApi("/performer/$performerId");
 export function PerformerPage() {
   const { performerId } = routeApi.useParams();
   const id = Number(performerId);
-  const [reframing, setReframing] = useState(false);
+  // Which crop is being adjusted: the tiles' 2:3, or the round picture here.
+  const [reframing, setReframing] = useState<"tile" | "circle" | null>(null);
   // Opening a video from here shows the modal in place, rather than
   // navigating away and losing your position on the profile.
   const [open, setOpen] = useState<{ id: number; autoPlay: boolean } | null>(
@@ -51,7 +54,21 @@ export function PerformerPage() {
       // The cards on the performers page and the home row show the same
       // portrait, so they have to repaint too.
       queryClient.invalidateQueries({ queryKey: ["performers"] });
-      setReframing(false);
+      setReframing(null);
+    },
+  });
+
+  const saveCircle = useMutation({
+    mutationFn: (next: FramingValue | null) =>
+      saveCircleFraming(
+        id,
+        next && { avatarPositionX: next.x, avatarPositionY: next.y, avatarScale: next.scale },
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["performer", id] });
+      // Everywhere else a round picture of them appears.
+      queryClient.invalidateQueries({ queryKey: ["performers"] });
+      setReframing(null);
     },
   });
 
@@ -129,7 +146,7 @@ export function PerformerPage() {
                 <img
                   src={avatarSrc}
                   alt=""
-                  style={performer ? portraitStyle(performer) : undefined}
+                  style={performer ? circleStyle(performer) : undefined}
                   className="h-full w-full object-cover"
                 />
               ) : (
@@ -147,8 +164,9 @@ export function PerformerPage() {
                 // A video-frame fallback can be reframed too — it's the same
                 // CSS object-position, and nothing about the file changes.
                 canReposition={Boolean(avatarSrc)}
-                onReposition={() => setReframing(true)}
-                onUploaded={() => setReframing(true)}
+                onReposition={() => setReframing("tile")}
+                onRepositionCircle={() => setReframing("circle")}
+                onUploaded={() => setReframing("tile")}
                 // Bottom-right of the circle, the way a profile picture is
                 // edited everywhere else.
                 className="bottom-0 right-0"
@@ -192,7 +210,37 @@ export function PerformerPage() {
             {/* Gated on `reframing` rather than rendering an empty wrapper on
                 every other view — that wrapper still counted as a flex child
                 and added a gap under the stats you could see but not explain. */}
-            {performer && reframing && avatarSrc && (
+            {performer && reframing === "circle" && avatarSrc && (
+              <div className="space-y-1.5">
+                <FramingEditor
+                  // Keyed so a reset starts the drag from the tile framing.
+                  key={`${performer.avatarPositionX}-${performer.avatarPositionY}-${performer.avatarScale}`}
+                  src={avatarSrc}
+                  value={{
+                    x: circleFraming(performer).imagePositionX ?? 50,
+                    y: circleFraming(performer).imagePositionY ?? 0,
+                    scale: circleFraming(performer).imageScale ?? 100,
+                  }}
+                  aspectClass="aspect-square"
+                  round
+                  saving={saveCircle.isPending}
+                  onSave={(next) => saveCircle.mutate(next)}
+                  onCancel={() => setReframing(null)}
+                  note="Used for the round picture here, in a video's details, in search and in the network graph. The tiles keep their own framing."
+                />
+                {performer.avatarPositionX != null && (
+                  <button
+                    type="button"
+                    onClick={() => saveCircle.mutate(null)}
+                    disabled={saveCircle.isPending}
+                    className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline disabled:opacity-50"
+                  >
+                    Match the tiles again
+                  </button>
+                )}
+              </div>
+            )}
+            {performer && reframing === "tile" && avatarSrc && (
               <FramingEditor
                 src={avatarSrc}
                 value={{
@@ -206,8 +254,8 @@ export function PerformerPage() {
                 aspectClass="aspect-[2/3]"
                 saving={saveFraming.isPending}
                 onSave={(next) => saveFraming.mutate(next)}
-                onCancel={() => setReframing(false)}
-                note="Used on the performers page, the home row and the avatar in a video's details."
+                onCancel={() => setReframing(null)}
+                note="Used for the tiles on the performers page, the home row and elsewhere. The round picture has its own framing."
               />
             )}
           </div>

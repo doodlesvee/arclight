@@ -9,6 +9,7 @@ import {
   playbackStates,
   studios,
 } from "../db/schema.js";
+import { affinityEdges } from "../library/affinity.js";
 
 // The co-performer query joins media_item_performers and performers to
 // themselves — once for the performer whose page this is, once for everyone
@@ -88,6 +89,9 @@ export async function performerRoutes(app: FastifyInstance): Promise<void> {
         imagePositionX: performers.imagePositionX,
         imagePositionY: performers.imagePositionY,
         imageScale: performers.imageScale,
+        avatarPositionX: performers.avatarPositionX,
+        avatarPositionY: performers.avatarPositionY,
+        avatarScale: performers.avatarScale,
         // count(<column>) rather than count(*): on a LEFT JOIN with no match,
         // count(*) counts the NULL-padded row and reports 1.
         videoCount: sql<number>`count(${mediaItems.id})::int`,
@@ -121,6 +125,156 @@ export async function performerRoutes(app: FastifyInstance): Promise<void> {
 
     return { performers: rows };
   });
+
+  // The whole library as a graph: every performer with at least one video,
+  // and one edge per connected pair. `by` picks what connects them — videos
+  // they appear in together (the default), or studios they have in
+  // common, which link people who have never shared a scene. Built from flat
+  // queries stitched together here, rather than one query with nested
+  // aggregates, so each stays a plain GROUP BY.
+  app.get<{ Querystring: { by?: string } }>(
+    "/api/performers/network",
+    async (request) => {
+      const by = request.query.by === "studios" ? "studios" : "videos";
+      const videoTypeIds = db
+        .select({ id: mediaItemTypes.id })
+        .from(mediaItemTypes)
+        .where(eq(mediaItemTypes.name, "video"));
+
+      const visibleVideoItem = and(
+        eq(mediaItems.inScope, true),
+        isNull(mediaItems.missingSince),
+        inArray(mediaItems.itemTypeId, videoTypeIds)
+      );
+      const visibleVideo = and(
+        eq(mediaItems.id, mediaItemPerformers.mediaItemId),
+        visibleVideoItem
+      );
+
+      // Inner joins this time: a performer with no videos has nothing to be
+      // connected by, so there is no node to draw for them.
+      const nodes = await db
+        .select({
+          id: performers.id,
+          name: performers.name,
+          isFavorite: performers.isFavorite,
+          hasImage: sql<boolean>`(${performers.imageFile} is not null)`,
+          hasBanner: sql<boolean>`(${performers.bannerFile} is not null)`,
+          imagePositionX: performers.imagePositionX,
+          imagePositionY: performers.imagePositionY,
+          imageScale: performers.imageScale,
+          avatarPositionX: performers.avatarPositionX,
+          avatarPositionY: performers.avatarPositionY,
+          avatarScale: performers.avatarScale,
+          videoCount: sql<number>`count(*)::int`,
+          representativeItemId: sql<number | null>`max(${mediaItems.id})`,
+          // For the graph's highlights and hover cards.
+          studioCount: sql<number>`count(distinct ${mediaItems.studioId})::int`,
+          // Finished videos count their full length once per play; one in
+          // progress counts as far as you got.
+          watchedSeconds: sql<number>`coalesce(sum(case
+            when ${playbackStates.playCount} > 0
+              then coalesce(${mediaItems.durationSeconds}, 0) * ${playbackStates.playCount}
+            else coalesce(${playbackStates.positionSeconds}, 0)
+          end), 0)::int`,
+          averageRating: sql<number | null>`round(avg(${mediaItems.rating}), 1)::float`,
+        })
+        .from(performers)
+        .innerJoin(mediaItemPerformers, eq(mediaItemPerformers.performerId, performers.id))
+        .innerJoin(mediaItems, visibleVideo)
+        .leftJoin(playbackStates, eq(playbackStates.mediaItemId, mediaItems.id))
+        .groupBy(performers.id)
+        .orderBy(sql`lower(${performers.name})`);
+
+      // `performer_id < other` counts each pair once, not once from each end.
+      const videoEdges = async () => db
+        .select({
+          source: mediaItemPerformers.performerId,
+          target: otherCredits.performerId,
+          together: sql<number>`count(*)::int`,
+        })
+        .from(mediaItemPerformers)
+        .innerJoin(mediaItems, visibleVideo)
+        .innerJoin(
+          otherCredits,
+          and(
+            eq(otherCredits.mediaItemId, mediaItemPerformers.mediaItemId),
+            sql`${otherCredits.performerId} > ${mediaItemPerformers.performerId}`
+          )
+        )
+        .groupBy(mediaItemPerformers.performerId, otherCredits.performerId);
+
+      // Distinct (performer, studio) pairs across their visible videos.
+      const studioEdges = async () =>
+        affinityEdges(
+          await db
+            .selectDistinct({
+              performerId: mediaItemPerformers.performerId,
+              key: studios.id,
+              label: studios.name,
+            })
+            .from(mediaItemPerformers)
+            .innerJoin(mediaItems, visibleVideo)
+            .innerJoin(studios, eq(studios.id, mediaItems.studioId))
+        );
+
+      const edges =
+        by === "studios" ? await studioEdges() : await videoEdges();
+
+      // Each performer's most frequent studio, which the graph colours them by
+      // so studio clusters are visible at a glance. Ties go to the name first
+      // alphabetically, so the colour doesn't flicker between loads.
+      const studioCounts = await db
+        .select({
+          performerId: mediaItemPerformers.performerId,
+          studioId: studios.id,
+          studio: studios.name,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(mediaItemPerformers)
+        .innerJoin(mediaItems, visibleVideo)
+        .innerJoin(studios, eq(studios.id, mediaItems.studioId))
+        .groupBy(mediaItemPerformers.performerId, studios.id, studios.name)
+        .orderBy(desc(sql`count(*)`), sql`lower(${studios.name})`);
+
+      const topStudio = new Map<number, string>();
+      for (const row of studioCounts) {
+        if (!topStudio.has(row.performerId)) topStudio.set(row.performerId, row.studio);
+      }
+
+      // In studio mode the graph can draw the studios themselves, each linked
+      // to the performers who have worked for it — the same rows as above,
+      // plus each studio's own size for the circle.
+      const studioGraph =
+        by === "studios"
+          ? {
+              studios: await db
+                .select({
+                  id: studios.id,
+                  name: studios.name,
+                  videoCount: sql<number>`count(*)::int`,
+                })
+                .from(mediaItems)
+                .innerJoin(studios, eq(studios.id, mediaItems.studioId))
+                .where(visibleVideoItem)
+                .groupBy(studios.id, studios.name)
+                .orderBy(sql`lower(${studios.name})`),
+              memberships: studioCounts.map((row) => ({
+                performerId: row.performerId,
+                studioId: row.studioId,
+                videos: row.count,
+              })),
+            }
+          : {};
+
+      return {
+        by,
+        nodes: nodes.map((node) => ({ ...node, topStudio: topStudio.get(node.id) ?? null })),
+        edges,
+        ...studioGraph,
+      };
+    }
+  );
 
   // Backs the profile page: the performer plus enough aggregate to render the
   // header without a second round trip.
@@ -219,6 +373,9 @@ export async function performerRoutes(app: FastifyInstance): Promise<void> {
         imagePositionX: coPerformer.imagePositionX,
         imagePositionY: coPerformer.imagePositionY,
         imageScale: coPerformer.imageScale,
+        avatarPositionX: coPerformer.avatarPositionX,
+        avatarPositionY: coPerformer.avatarPositionY,
+        avatarScale: coPerformer.avatarScale,
         representativeItemId: sql<number | null>`max(${mediaItems.id})`,
         together: sql<number>`count(*)::int`,
       })
@@ -241,7 +398,10 @@ export async function performerRoutes(app: FastifyInstance): Promise<void> {
         coPerformer.bannerFile,
         coPerformer.imagePositionX,
         coPerformer.imagePositionY,
-        coPerformer.imageScale
+        coPerformer.imageScale,
+        coPerformer.avatarPositionX,
+        coPerformer.avatarPositionY,
+        coPerformer.avatarScale
       )
       .orderBy(desc(sql`count(*)`), sql`lower(${coPerformer.name})`);
 
@@ -311,6 +471,9 @@ export async function performerRoutes(app: FastifyInstance): Promise<void> {
       imagePositionX: performer.imagePositionX,
       imagePositionY: performer.imagePositionY,
       imageScale: performer.imageScale,
+      avatarPositionX: performer.avatarPositionX,
+      avatarPositionY: performer.avatarPositionY,
+      avatarScale: performer.avatarScale,
       videoCount: totals?.videoCount ?? 0,
       totalDurationSeconds: totals?.totalDurationSeconds ?? 0,
       representativeItemId: recentItems[0]?.id ?? null,
@@ -477,13 +640,26 @@ export async function performerRoutes(app: FastifyInstance): Promise<void> {
       imagePositionX?: number;
       imagePositionY?: number;
       imageScale?: number;
+      /** The circle's own framing; null clears it back to the tile's. */
+      avatarPositionX?: number | null;
+      avatarPositionY?: number | null;
+      avatarScale?: number | null;
     };
   }>(
     "/api/performers/:id",
     async (request, reply) => {
       const id = Number(request.params.id);
-      const { bio, isFavorite, bannerPositionY, imagePositionX, imagePositionY, imageScale } =
-        request.body;
+      const {
+        bio,
+        isFavorite,
+        bannerPositionY,
+        imagePositionX,
+        imagePositionY,
+        imageScale,
+        avatarPositionX,
+        avatarPositionY,
+        avatarScale,
+      } = request.body;
 
       // Everything that can be saved on its own, without re-sending the name:
       // the drag controls and the bio editor both patch a single field.
@@ -507,6 +683,12 @@ export async function performerRoutes(app: FastifyInstance): Promise<void> {
       if (imagePositionY !== undefined) partial.imagePositionY = clamp(imagePositionY, 0, 100);
       // Floor of 100: below it the portrait stops covering its tile.
       if (imageScale !== undefined) partial.imageScale = clamp(imageScale, 100, 300);
+      if (avatarPositionX !== undefined)
+        partial.avatarPositionX = avatarPositionX === null ? null : clamp(avatarPositionX, 0, 100);
+      if (avatarPositionY !== undefined)
+        partial.avatarPositionY = avatarPositionY === null ? null : clamp(avatarPositionY, 0, 100);
+      if (avatarScale !== undefined)
+        partial.avatarScale = avatarScale === null ? null : clamp(avatarScale, 100, 300);
 
       if (request.body.name === undefined && Object.keys(partial).length > 0) {
         const updated = await db

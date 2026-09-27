@@ -13,7 +13,7 @@ services:
       BROWSE_ROOTS: /media,/host/home,/host/volumes
       BACKUP_DIR: /app/backups
       APP_DATA_DIR: /app/app-data
-      WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN:-http://localhost:5173}
+      WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN:-http://localhost:5173,http://localhost:3000}
       # This machine's address on the wifi, for Settings → Privacy to show a
       # phone. Filled in by docker/with-lan-host.sh when started through
       # `npm run start:docker` / `dev:docker`.

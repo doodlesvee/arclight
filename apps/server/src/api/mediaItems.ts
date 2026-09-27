@@ -907,6 +907,9 @@ export async function mediaItemRoutes(app: FastifyInstance): Promise<void> {
         imagePositionX: performers.imagePositionX,
         imagePositionY: performers.imagePositionY,
         imageScale: performers.imageScale,
+        avatarPositionX: performers.avatarPositionX,
+        avatarPositionY: performers.avatarPositionY,
+        avatarScale: performers.avatarScale,
         representativeItemId: sql<number | null>`max(${mediaItems.id})`,
         // count(<column>) not count(*): a LEFT JOIN with no match would
         // otherwise count the NULL-padded row and report 1.
@@ -926,7 +929,10 @@ export async function mediaItemRoutes(app: FastifyInstance): Promise<void> {
         performers.bannerFile,
         performers.imagePositionX,
         performers.imagePositionY,
-        performers.imageScale
+        performers.imageScale,
+        performers.avatarPositionX,
+        performers.avatarPositionY,
+        performers.avatarScale
       )
       .orderBy(sql`lower(${performers.name})`)
       .limit(LIMIT);

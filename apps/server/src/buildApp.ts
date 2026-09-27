@@ -31,6 +31,7 @@ import { authRoutes } from "./api/auth.js";
 import { bookmarkRoutes } from "./api/bookmarks.js";
 import { storageRoutes } from "./api/storage.js";
 import { castRoutes } from "./api/cast.js";
+import { insightsRoutes } from "./api/insights.js";
 import { registerAuthGuard } from "./auth/guard.js";
 import { registerLanGuard } from "./net/lan.js";
 import { isRestoring } from "./backup/restoreState.js";
@@ -130,6 +131,7 @@ export async function buildApp({
   await app.register(bookmarkRoutes);
   await app.register(storageRoutes);
   await app.register(castRoutes);
+  await app.register(insightsRoutes);
 
   // In the production Docker image the built frontend is copied to ../web-dist
   // (see Dockerfile). In local dev that directory doesn't exist — the Vite dev
