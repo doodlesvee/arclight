@@ -16,6 +16,13 @@ const ROTATE_MS = 14000;
 // How far a touch has to travel sideways before it counts as a swipe rather
 // than a tap that wandered.
 const SWIPE_MIN_PX = 40;
+// The trackpad equivalent: sideways wheel travel that counts as one swipe,
+// and how long the wheel has to go quiet before the next swipe can register.
+// A two-finger flick keeps firing momentum events for a good half second
+// after the fingers lift; without the quiet gap one flick would skip several
+// slides.
+const WHEEL_SWIPE_PX = 60;
+const WHEEL_QUIET_MS = 250;
 
 const heroArrowClass =
   "absolute top-1/2 z-20 hidden size-11 md:flex -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white ring-1 ring-white/20 backdrop-blur-sm transition-colors hover:bg-black/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white";
@@ -351,12 +358,67 @@ export function HeroBanner({
     go(dx < 0 ? 1 : -1);
   }
 
+  // Sideways scroll on a trackpad (or a tilt wheel). A native listener, not
+  // React's onWheel: React registers wheel as passive, and a passive listener
+  // cannot preventDefault — which is what stops Chrome and Safari reading
+  // the same two-finger swipe as "go back a page".
+  const sectionRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el || items.length < 2) return;
+    let travel = 0;
+    // Which way the last swipe went while its momentum is still arriving;
+    // 0 once the wheel has gone quiet.
+    let locked: 0 | 1 | -1 = 0;
+    let quiet: ReturnType<typeof setTimeout> | undefined;
+    const onWheel = (event: WheelEvent) => {
+      // Vertical-dominant means the page is being scrolled past the hero;
+      // leave that alone entirely.
+      if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
+      event.preventDefault();
+      clearTimeout(quiet);
+      quiet = setTimeout(() => {
+        travel = 0;
+        locked = 0;
+      }, WHEEL_QUIET_MS);
+      // Momentum only ever runs the same way as the swipe that caused it, so
+      // travel the other way is a new swipe back and goes through at once.
+      // Waiting for quiet here swallowed it: the trailing momentum kept the
+      // timer from ever firing while you were already swiping back.
+      const direction = Math.sign(event.deltaX) as 1 | -1;
+      if (locked === direction) return;
+      if (locked !== 0) {
+        locked = 0;
+        travel = 0;
+      }
+      // A change of mind before the threshold starts the count afresh,
+      // rather than having to undo the travel already built up.
+      if (Math.sign(travel) === -direction) travel = 0;
+      travel += event.deltaX;
+      if (Math.abs(travel) < WHEEL_SWIPE_PX) return;
+      // Positive deltaX is content moving left — the next slide, the same
+      // way round as a touch swipe.
+      const swipe = travel > 0 ? 1 : -1;
+      go(swipe);
+      locked = swipe;
+      travel = 0;
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      clearTimeout(quiet);
+    };
+    // `go` only uses the functional setIndex and items.length, both covered.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length]);
+
   if (items.length === 0) return null;
 
   const item = items[index];
 
   return (
     <section
+      ref={sectionRef}
       // Height in vh rather than a pixel floor: the slider is a percentage of
       // the screen, and a min-height in pixels would quietly ignore it at the
       // low end.
