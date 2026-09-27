@@ -15,6 +15,7 @@ import { MediaDetailModal } from "./MediaDetailModal";
 import { NotificationCenter } from "./NotificationCenter";
 import { CardShortcutProvider } from "@/lib/cardShortcuts";
 import type { PlayItemDetail } from "@/lib/appEvents";
+import { useAchievementWatcher } from "@/lib/useAchievementWatcher";
 
 const SIDEBAR_STORAGE_KEY = "sidebar-collapsed";
 
@@ -45,6 +46,7 @@ export function AppShell({
 }) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const isMobile = useIsMobile();
+  useAchievementWatcher();
   const [drawerRequested, setDrawerRequested] = useState(false);
   // Derived rather than reset by an effect, so growing past `md` with the
   // drawer open can never leave a stale overlay over the desktop layout.

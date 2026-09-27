@@ -2,6 +2,7 @@ import { and, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { db } from "../db/client.js";
 import {
+  bookmarks,
   mediaItemPerformers,
   mediaItems,
   mediaItemTypes,
@@ -125,6 +126,10 @@ export async function insightsRoutes(app: FastifyInstance): Promise<void> {
       .where(visibleVideo)
       .groupBy(studios.name);
 
+    const [{ bookmarkCount }] = await db
+      .select({ bookmarkCount: sql<number>`count(*)::int` })
+      .from(bookmarks);
+
     return {
       log: log.map((row) => ({ ...row, hour: row.hour.toISOString() })),
       items: items.map((item) => ({
@@ -134,6 +139,7 @@ export async function insightsRoutes(app: FastifyInstance): Promise<void> {
       })),
       performers: performerRows,
       studios: studioRows,
+      bookmarkCount,
     };
   });
 }

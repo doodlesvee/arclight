@@ -40,6 +40,8 @@ export type Insights = {
   items: InsightItem[];
   performers: InsightPerformer[];
   studios: InsightStudio[];
+  /** Saved bookmarks across the library. Optional so older payloads still parse. */
+  bookmarkCount?: number;
 };
 
 /** A day counts towards a streak once you've watched at least this much. */
@@ -281,26 +283,121 @@ export type Achievement = {
   progress: number;
   /** "3 of 5 days", for the locked ones. */
   progressLabel?: string;
+  /**
+   * Badges that come in bronze, silver and gold share a family; each tier is
+   * its own badge with its own id, so each one unlocks (and toasts) on its own.
+   */
+  family?: string;
+  tier?: 1 | 2 | 3;
 };
 
 const hoursOf = (seconds: number) => seconds / 3600;
 
+/** Whole days from one "YYYY-MM-DD" to another. */
+function daysBetween(from: string, to: string): number {
+  const utc = (day: string) => {
+    const [y, m, d] = day.split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((utc(to) - utc(from)) / 86_400_000);
+}
+
+const weekdayOf = (day: string) => {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(y, m - 1, d).getDay();
+};
+
+/** The longest run of consecutive days in a set of "YYYY-MM-DD" days. */
+function longestRun(days: Set<string>): number {
+  let best = 0;
+  for (const day of days) {
+    if (days.has(addDays(day, -1))) continue;
+    let length = 1;
+    while (days.has(addDays(day, length))) length++;
+    best = Math.max(best, length);
+  }
+  return best;
+}
+
 /**
  * Every badge, earned or not, with how close the locked ones are. Built from
- * the watch log, play counts, ratings and how much of each performer and
- * studio you've finished.
+ * the watch log, play counts, ratings, bookmarks and how much of each
+ * performer and studio you've finished.
+ *
+ * Tier one of each family keeps the id it had before tiers existed, so a
+ * badge unlocked back then is still recognised as unlocked now.
  */
 export function achievements(data: Insights, today: string): Achievement[] {
   const days = secondsByDay(data.log);
+  const activeDays = [...days.entries()]
+    .filter(([, seconds]) => seconds >= ACTIVE_DAY_SECONDS)
+    .map(([day]) => day)
+    .sort();
+  const active = new Set(activeDays);
   const total = data.log.reduce((sum, entry) => sum + entry.seconds, 0);
   const { longest } = streaks(days, today);
   const bestDay = Math.max(0, ...days.values());
   const localHours = data.log.map((entry) => new Date(entry.hour).getHours());
-  const studiosWatched = new Set(
-    data.items.filter((item) => item.completedAt && item.studio).map((item) => item.studio),
-  ).size;
+  const finished = data.items.filter((item) => item.completedAt);
+  const studiosWatched = new Set(finished.filter((item) => item.studio).map((item) => item.studio)).size;
   const rated = data.items.filter((item) => item.rating != null).length;
   const mostPlays = Math.max(0, ...data.items.map((item) => item.playCount));
+
+  // Finishes per local day. Only an item's latest finish is known, so a
+  // rewatch moves it rather than counting twice.
+  const finishesByDay = new Map<string, number>();
+  for (const item of finished) {
+    const day = localDay(new Date(item.completedAt!));
+    finishesByDay.set(day, (finishesByDay.get(day) ?? 0) + 1);
+  }
+  const bestFinishDay = Math.max(0, ...finishesByDay.values());
+
+  const weekends = activeDays.filter((day) => weekdayOf(day) === 6 && active.has(addDays(day, 1))).length;
+
+  // Distinct active days in each Monday-to-Sunday week.
+  const perWeek = new Map<string, number>();
+  for (const day of activeDays) {
+    const monday = addDays(day, -((weekdayOf(day) + 6) % 7));
+    perWeek.set(monday, (perWeek.get(monday) ?? 0) + 1);
+  }
+  const fullestWeek = Math.max(0, ...perWeek.values());
+
+  const lunchDays = new Set(
+    data.log
+      .filter((entry) => entry.seconds > 0 && new Date(entry.hour).getHours() === 12)
+      .map((entry) => localDay(new Date(entry.hour))),
+  ).size;
+
+  const longestGap = activeDays.reduce(
+    (gap, day, i) => (i === 0 ? gap : Math.max(gap, daysBetween(activeDays[i - 1], day))),
+    0,
+  );
+  const sinceFirst = activeDays.length > 0 ? daysBetween(activeDays[0], today) : 0;
+
+  const longHaul = finished.some((item) => (item.durationSeconds ?? 0) >= 2 * 3600);
+  const shorts = finished.filter(
+    (item) => item.durationSeconds != null && item.durationSeconds > 0 && item.durationSeconds < 600,
+  ).length;
+  const fiveStars = data.items.filter((item) => item.rating === 5).length;
+  const oneStar = data.items.some((item) => item.rating === 1);
+
+  // Days each video was watched on, for the three-days-running badge.
+  const daysByItem = new Map<number, Set<string>>();
+  for (const entry of data.log) {
+    if (entry.seconds <= 0) continue;
+    const set = daysByItem.get(entry.mediaItemId) ?? new Set<string>();
+    set.add(localDay(new Date(entry.hour)));
+    daysByItem.set(entry.mediaItemId, set);
+  }
+  const bestItemRun = Math.max(0, ...[...daysByItem.values()].map(longestRun));
+
+  // Performers in anything you actually watched — rated-only items don't count.
+  const performersSeen = new Set(
+    data.items
+      .filter((item) => daysByItem.has(item.id) || item.completedAt || item.playCount > 0)
+      .flatMap((item) => item.performerIds),
+  ).size;
+  const bookmarks = data.bookmarkCount ?? 0;
 
   const goal = (
     id: string,
@@ -318,33 +415,79 @@ export function achievements(data: Insights, today: string): Achievement[] {
     // "3 of 5 days": the unit once, on the target.
     progressLabel: `${unit(Math.min(value, target)).split(" ")[0]} of ${unit(target)}`,
   });
+  const flag = (id: string, title: string, description: string, earned: boolean, progress = earned ? 1 : 0): Achievement => ({
+    id,
+    title,
+    description,
+    earned,
+    progress: Math.min(1, progress),
+  });
+  /** Bronze, silver and gold of one goal, each its own badge. */
+  const tiers = (
+    family: string,
+    value: number,
+    unit: (n: number) => string,
+    steps: [id: string, title: string, description: string, target: number][],
+  ): Achievement[] =>
+    steps.map(([id, title, description, target], i) => ({
+      ...goal(id, title, description, value, target, unit),
+      family,
+      tier: (i + 1) as 1 | 2 | 3,
+    }));
   const days_ = (n: number) => `${Math.floor(n)} day${Math.floor(n) === 1 ? "" : "s"}`;
   const hours_ = (n: number) => `${n < 10 ? n.toFixed(1).replace(/\.0$/, "") : Math.floor(n)} h`;
   const count_ = (n: number) => `${Math.floor(n)}`;
 
   const list: Achievement[] = [
-    goal("first-hour", "First hour", "Watch an hour in total.", hoursOf(total), 1, hours_),
-    goal("marathon", "Marathon", "Watch two hours in a single day.", hoursOf(bestDay), 2, hours_),
-    goal("streak-5", "5-day streak", "Watch something five days running.", longest, 5, days_),
-    goal("streak-30", "30-day streak", "A whole month without missing a day.", longest, 30, days_),
-    goal("century", "Century", "A hundred hours in total.", hoursOf(total), 100, hours_),
-    {
-      id: "night-owl",
-      title: "Night owl",
-      description: "Watch between midnight and 4 am.",
-      earned: localHours.some((h) => h < 4),
-      progress: localHours.some((h) => h < 4) ? 1 : 0,
-    },
-    {
-      id: "early-bird",
-      title: "Early bird",
-      description: "Watch between 5 and 7 am.",
-      earned: localHours.some((h) => h >= 5 && h < 7),
-      progress: localHours.some((h) => h >= 5 && h < 7) ? 1 : 0,
-    },
-    goal("explorer", "Explorer", "Finish videos from five different studios.", studiosWatched, 5, count_),
-    goal("critic", "Critic", "Rate 25 videos.", rated, 25, count_),
+    ...tiers("watch-time", hoursOf(total), hours_, [
+      ["first-hour", "First hour", "Watch an hour in total.", 1],
+      ["century", "Century", "A hundred hours in total.", 100],
+      ["watch-time-t3", "Five hundred club", "Five hundred hours in total.", 500],
+    ]),
+    ...tiers("marathon", hoursOf(bestDay), hours_, [
+      ["marathon", "Marathon", "Watch two hours in a single day.", 2],
+      ["marathon-t2", "Ultramarathon", "Watch four hours in a single day.", 4],
+      ["marathon-t3", "Iron eyes", "Watch six hours in a single day.", 6],
+    ]),
+    ...tiers("streak", longest, days_, [
+      ["streak-5", "5-day streak", "Watch something five days running.", 5],
+      ["streak-30", "30-day streak", "A whole month without missing a day.", 30],
+      ["streak-100", "100-day streak", "A hundred days without missing one.", 100],
+    ]),
+    ...tiers("critic", rated, count_, [
+      ["critic", "Critic", "Rate 25 videos.", 25],
+      ["critic-t2", "Reviewer", "Rate 100 videos.", 100],
+      ["critic-t3", "Chief critic", "Rate 250 videos.", 250],
+    ]),
+    ...tiers("explorer", studiosWatched, count_, [
+      ["explorer", "Explorer", "Finish videos from five different studios.", 5],
+      ["explorer-t2", "Voyager", "Finish videos from 15 different studios.", 15],
+      ["explorer-t3", "Cartographer", "Finish videos from 30 different studios.", 30],
+    ]),
+    ...tiers("people", performersSeen, count_, [
+      ["people-t1", "People person", "Watch videos with 10 different performers.", 10],
+      ["people-t2", "Social butterfly", "Watch videos with 25 different performers.", 25],
+      ["people-t3", "Who's who", "Watch videos with 50 different performers.", 50],
+    ]),
+    ...tiers("moments", bookmarks, count_, [
+      ["moments-t1", "Moment keeper", "Save 10 bookmarks.", 10],
+      ["moments-t2", "Scrapbooker", "Save 50 bookmarks.", 50],
+      ["moments-t3", "Archivist", "Save 100 bookmarks.", 100],
+    ]),
+    flag("night-owl", "Night owl", "Watch between midnight and 4 am.", localHours.some((h) => h < 4)),
+    flag("early-bird", "Early bird", "Watch between 5 and 7 am.", localHours.some((h) => h >= 5 && h < 7)),
+    goal("lunch-break", "Lunch break", "Watch during the noon hour on five different days.", lunchDays, 5, days_),
     goal("rewatcher", "On repeat", "Finish the same video three times.", mostPlays, 3, count_),
+    goal("binge", "Binge", "Finish five videos in a single day.", bestFinishDay, 5, count_),
+    goal("weekend-warrior", "Weekend warrior", "Watch on both days of four weekends.", weekends, 4, count_),
+    goal("full-week", "Full week", "Watch every day from Monday to Sunday.", fullestWeek, 7, days_),
+    goal("hat-trick", "Hat-trick", "Watch the same video three days running.", bestItemRun, 3, days_),
+    goal("short-and-sweet", "Short & sweet", "Finish ten videos under ten minutes.", shorts, 10, count_),
+    goal("tastemaker", "Tastemaker", "Give ten videos five stars.", fiveStars, 10, count_),
+    goal("anniversary", "Anniversary", "A year since the first thing you watched.", sinceFirst, 365, days_),
+    flag("long-haul", "Long haul", "Finish a video two hours or longer.", longHaul),
+    flag("tough-crowd", "Tough crowd", "Give a video one star.", oneStar),
+    flag("comeback", "Comeback", "Come back after a month or more away.", longestGap > 30),
   ];
 
   // Completionist badges: one earned badge per performer or studio you've
@@ -393,6 +536,37 @@ export function achievements(data: Insights, today: string): Achievement[] {
 
   // Earned first, then the ones you're nearest to.
   return list.sort((a, b) => Number(b.earned) - Number(a.earned) || b.progress - a.progress);
+}
+
+/**
+ * The shelf as the Stats page shows it: a tiered family appears once, as the
+ * highest tier you hold, plus its next tier among the ones still to unlock.
+ * Every tier still counts on its own towards "n of m unlocked".
+ */
+export function trophyShelf(list: Achievement[]): { earned: Achievement[]; locked: Achievement[] } {
+  const top = new Map<string, Achievement>();
+  const next = new Map<string, Achievement>();
+  const earned: Achievement[] = [];
+  const locked: Achievement[] = [];
+  for (const badge of list) {
+    if (!badge.family) {
+      (badge.earned ? earned : locked).push(badge);
+      continue;
+    }
+    const map = badge.earned ? top : next;
+    const held = map.get(badge.family);
+    const better = badge.earned ? (held?.tier ?? 0) < (badge.tier ?? 0) : (held?.tier ?? 4) > (badge.tier ?? 0);
+    if (!held || better) map.set(badge.family, badge);
+  }
+  earned.push(...top.values());
+  locked.push(...next.values());
+  const order = (a: Achievement, b: Achievement) => b.progress - a.progress;
+  return { earned, locked: locked.sort(order) };
+}
+
+/** The earned badges in `list` that `unlocked` has no record of yet. */
+export function newlyEarned(list: Achievement[], unlocked: Record<string, string>): Achievement[] {
+  return list.filter((badge) => badge.earned && !(badge.id in unlocked));
 }
 
 export type FunFacts = {

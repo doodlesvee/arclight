@@ -198,6 +198,19 @@
   }
 }
 
+/* An unlock toast's medal lands with a small bounce, once. */
+@keyframes trophyPop {
+  0% {
+    transform: scale(0.4) rotate(-20deg);
+  }
+  60% {
+    transform: scale(1.15) rotate(6deg);
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+
 /* The peek panel slides in from the edge it is docked to, so the motion says
    where it came from and where closing it will put it back. */
 @keyframes slideInRight {
@@ -234,6 +247,10 @@
 
   .animate-toast-in {
     animation: toastIn 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-trophy-pop {
+    animation: trophyPop 520ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
   }
 
   .motion-card {

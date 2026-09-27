@@ -1,19 +1,31 @@
 import { useEffect, useMemo, useState } from "react";
 import type React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import {
+  Award,
+  Bookmark,
+  Cake,
+  CalendarCheck,
+  CalendarDays,
   Clock,
+  Coffee,
   Compass,
   Flame,
+  Hourglass,
   Lock,
   Medal,
   Moon,
-  Play,
   Repeat,
+  RotateCcw,
+  Sparkles,
   Star,
   Sunrise,
+  ThumbsDown,
+  Timer,
   Trophy,
+  Users,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
@@ -32,12 +44,14 @@ import {
   recapMonths,
   secondsByDay,
   streaks,
+  trophyShelf,
   type Achievement,
   type Insights,
   type InsightItem,
   type InsightPerformer,
 } from "@/lib/insights";
 import { fetchInsights } from "@/lib/insightsApi";
+import { fetchAchievements } from "@/lib/achievementsApi";
 import { fetchItem, thumbnailUrl } from "@/lib/mediaItemApi";
 import { circleStyle, performerPortraitUrl } from "@/lib/performerApi";
 import { cn } from "@/lib/utils";
@@ -101,6 +115,15 @@ function StatsStory({
   const hall = useMemo(() => hallOfFame(data), [data]);
   const headline = useHeadline(data, hall.mainEvent);
   const hasHistory = total >= 60;
+  // Shared with the app-wide unlock watcher, which keeps it current.
+  const { data: record } = useQuery({ queryKey: ["achievements"], queryFn: fetchAchievements, staleTime: Infinity });
+
+  // An unlock toast's "View" lands here with #trophies; the chapter only
+  // exists once the data has, so the browser's own jump would miss it.
+  const hash = useRouterState({ select: (state) => state.location.hash });
+  useEffect(() => {
+    if (hash === "trophies") document.getElementById("trophies")?.scrollIntoView({ behavior: "smooth" });
+  }, [hash]);
 
   const itemsById = useMemo(() => new Map(data.items.map((i) => [i.id, i])), [data]);
   const watchedIds = new Set(data.log.map((e) => e.mediaItemId));
@@ -142,8 +165,8 @@ function StatsStory({
           </Chapter>
         )}
 
-        <Chapter number={hasHistory ? "04" : "03"} title="Trophies" kicker="Achievements">
-          <Trophies list={achievements(data, today)} />
+        <Chapter id="trophies" number={hasHistory ? "04" : "03"} title="Trophies" kicker="Achievements">
+          <Trophies list={achievements(data, today)} unlocked={record?.unlocked ?? {}} />
         </Chapter>
       </div>
     </div>
@@ -154,11 +177,13 @@ function StatsStory({
 
 /** A numbered chapter: a hairline rule, a small kicker, a big title. */
 function Chapter({
+  id,
   number,
   title,
   kicker,
   children,
 }: {
+  id?: string;
   number: string;
   title: string;
   kicker: string;
@@ -166,7 +191,10 @@ function Chapter({
 }) {
   const { motion } = useAppearance();
   return (
-    <section className={cn("border-t border-border pt-8 mt-16 first:mt-12", motion === "full" && "animate-fade-up")}>
+    <section
+      id={id}
+      className={cn("scroll-mt-20 border-t border-border pt-8 mt-16 first:mt-12", motion === "full" && "animate-fade-up")}
+    >
       <div className="mb-8 flex items-baseline gap-5">
         <span className="font-mono text-sm tabular-nums text-muted-foreground">{number}</span>
         <div>
@@ -1051,40 +1079,96 @@ function Habits({ data, lateShare }: { data: Insights; lateShare: number }) {
 
 // --- 04 Trophies ------------------------------------------------------------
 
-function badgeIcon(id: string): LucideIcon {
-  if (id.startsWith("streak")) return Flame;
-  if (id === "night-owl") return Moon;
-  if (id === "early-bird") return Sunrise;
-  if (id === "critic") return Star;
-  if (id === "rewatcher") return Repeat;
-  if (id === "explorer") return Compass;
-  if (id.includes("complete")) return Medal;
-  if (id === "marathon" || id === "first-hour" || id === "century") return Clock;
-  return Trophy;
+const BADGE_ICONS: Record<string, LucideIcon> = {
+  "night-owl": Moon,
+  "early-bird": Sunrise,
+  "lunch-break": Coffee,
+  rewatcher: Repeat,
+  binge: Zap,
+  "weekend-warrior": CalendarDays,
+  "full-week": CalendarCheck,
+  "hat-trick": Sparkles,
+  "short-and-sweet": Timer,
+  tastemaker: Award,
+  anniversary: Cake,
+  "long-haul": Hourglass,
+  "tough-crowd": ThumbsDown,
+  comeback: RotateCcw,
+};
+
+const FAMILY_ICONS: Record<string, LucideIcon> = {
+  "watch-time": Clock,
+  marathon: Clock,
+  streak: Flame,
+  critic: Star,
+  explorer: Compass,
+  people: Users,
+  moments: Bookmark,
+};
+
+function badgeIcon(badge: Achievement): LucideIcon {
+  if (badge.family) return FAMILY_ICONS[badge.family] ?? Trophy;
+  if (badge.id.includes("complete")) return Medal;
+  return BADGE_ICONS[badge.id] ?? Trophy;
 }
 
-function Trophies({ list }: { list: Achievement[] }) {
-  const earned = list.filter((a) => a.earned);
-  const locked = list.filter((a) => !a.earned);
+const TIER_NAMES = { 1: "Bronze", 2: "Silver", 3: "Gold" } as const;
+
+// Single badges keep the gold they always had; tiers step up to it.
+const MEDAL_STYLES = {
+  1: "from-orange-300 via-orange-700 to-amber-950 text-orange-50 shadow-[0_8px_30px_-8px_rgba(194,65,12,0.5)] ring-orange-700/25",
+  2: "from-slate-50 via-slate-300 to-slate-500 text-slate-900 shadow-[0_8px_30px_-8px_rgba(203,213,225,0.5)] ring-slate-200/20",
+  3: "from-amber-200 via-amber-400 to-amber-700 text-amber-950 shadow-[0_8px_30px_-8px_rgba(245,158,11,0.6)] ring-amber-300/20",
+} as const;
+
+function unlockedOn(iso: string | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return date.toLocaleDateString(undefined, { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }) });
+}
+
+function Trophies({ list, unlocked }: { list: Achievement[]; unlocked: Record<string, string> }) {
+  const earnedCount = list.filter((a) => a.earned).length;
+  const shelf = trophyShelf(list);
+  // Newest unlock first; anything not yet recorded (a first visit, before the
+  // watcher has saved it) goes to the front too, since it's just happened.
+  const earned = [...shelf.earned].sort(
+    (a, b) => (unlocked[b.id] ?? "￿").localeCompare(unlocked[a.id] ?? "￿"),
+  );
+  const locked = shelf.locked;
   return (
     <div className="space-y-12">
       <div>
         <p className="mb-5 text-2xl font-bold tracking-tight">
-          <span className="text-amber-300 tabular-nums">{earned.length}</span> of {list.length} unlocked
+          <span className="text-amber-300 tabular-nums">{earnedCount}</span> of {list.length} unlocked
         </p>
         {earned.length === 0 ? (
           <p className="text-muted-foreground">None yet — your first one is an hour of watching away.</p>
         ) : (
           <div className="flex flex-wrap gap-x-6 gap-y-8">
             {earned.map((badge) => {
-              const Icon = badgeIcon(badge.id);
+              const Icon = badgeIcon(badge);
+              const when = unlockedOn(unlocked[badge.id]);
+              const tierName = badge.tier ? TIER_NAMES[badge.tier] : null;
               return (
                 <div key={badge.id} className="group flex w-28 flex-col items-center text-center" title={badge.description}>
-                  <span className="grid size-20 place-items-center rounded-full bg-gradient-to-br from-amber-200 via-amber-400 to-amber-700 text-amber-950 shadow-[0_8px_30px_-8px_rgba(245,158,11,0.6)] ring-4 ring-amber-300/20 transition-transform group-hover:-translate-y-1 group-hover:rotate-6">
+                  <span
+                    className={cn(
+                      "grid size-20 place-items-center rounded-full bg-gradient-to-br ring-4 transition-transform group-hover:-translate-y-1 group-hover:rotate-6",
+                      MEDAL_STYLES[badge.tier ?? 3],
+                    )}
+                  >
                     <Icon className="size-8" />
                   </span>
                   <span className="sensitive mt-3 text-sm font-semibold leading-tight">{badge.title}</span>
                   <span className="mt-1 text-[11px] leading-snug text-muted-foreground">{badge.description}</span>
+                  {(tierName || when) && (
+                    <span className="mt-1.5 whitespace-nowrap text-[11px] font-medium text-muted-foreground/80">
+                      {[tierName, when].filter(Boolean).join(" · ")}
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -1097,14 +1181,19 @@ function Trophies({ list }: { list: Achievement[] }) {
           <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.25em] text-muted-foreground">Still to unlock</p>
           <ul className="grid gap-x-10 gap-y-1 md:grid-cols-2">
             {locked.map((badge) => {
-              const Icon = badgeIcon(badge.id);
+              const Icon = badgeIcon(badge);
               return (
                 <li key={badge.id} className="flex items-center gap-4 border-b border-border py-3">
                   <span className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground">
                     {badge.progress > 0 ? <Icon className="size-4" /> : <Lock className="size-3.5" />}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="sensitive truncate text-sm font-medium">{badge.title}</p>
+                    <p className="truncate text-sm font-medium">
+                      <span className="sensitive">{badge.title}</span>
+                      {badge.tier && (
+                        <span className="ml-2 text-[11px] font-normal text-muted-foreground">Tier {badge.tier} of 3</span>
+                      )}
+                    </p>
                     <p className="truncate text-xs text-muted-foreground">{badge.description}</p>
                   </div>
                   {badge.progressLabel && (

@@ -8,7 +8,9 @@ import {
   localDay,
   monthRecap,
   secondsByDay,
+  newlyEarned,
   streaks,
+  trophyShelf,
   type Insights,
 } from "./insights";
 
@@ -111,5 +113,58 @@ describe("insights", () => {
     expect(byId.get("performer-complete-next")?.title).toBe("All of Bea");
     // Earned badges sort first.
     expect(list[0].earned).toBe(true);
+  });
+
+  it("keeps the pre-tier ids as tier one and shows each family once on the shelf", () => {
+    const list = achievements(data, localDay(new Date(2026, 8, 4)));
+    const byId = new Map(list.map((a) => [a.id, a]));
+    expect(byId.get("first-hour")).toMatchObject({ earned: true, family: "watch-time", tier: 1 });
+    expect(byId.get("century")).toMatchObject({ earned: false, family: "watch-time", tier: 2 });
+    const shelf = trophyShelf(list);
+    expect(shelf.earned.map((a) => a.id)).toContain("first-hour");
+    expect(shelf.locked.map((a) => a.id)).toContain("century");
+    expect(shelf.locked.map((a) => a.id)).not.toContain("watch-time-t3");
+    // Each tier still counts on its own towards the total.
+    expect(shelf.earned.length + shelf.locked.length).toBeLessThan(list.length);
+  });
+
+  it("awards the day-shape, rating and bookmark badges", () => {
+    const item = (id: number, extra: Partial<Insights["items"][number]>) => ({
+      id, title: `#${id}`, thumbnailFile: null, durationSeconds: 300, rating: null, studio: null,
+      playCount: 1, completedAt: null, performerIds: [], ...extra,
+    });
+    const shorts = Array.from({ length: 10 }, (_, i) =>
+      item(i + 1, { rating: 5, completedAt: at(2026, 9, 6, 21), performerIds: [100 + i] }),
+    );
+    const rich: Insights = {
+      log: [
+        { mediaItemId: 50, hour: at(2026, 7, 1), seconds: 600 },
+        // Saturday, Sunday and Monday at noon, all the same video.
+        { mediaItemId: 50, hour: at(2026, 9, 5, 12), seconds: 600 },
+        { mediaItemId: 50, hour: at(2026, 9, 6, 12), seconds: 600 },
+        { mediaItemId: 50, hour: at(2026, 9, 7, 12), seconds: 600 },
+      ],
+      items: [...shorts, item(50, { durationSeconds: 7200, rating: 1, completedAt: at(2026, 9, 7, 14) })],
+      performers: [],
+      studios: [],
+      bookmarkCount: 12,
+    };
+    const byId = new Map(achievements(rich, localDay(new Date(2026, 8, 8))).map((a) => [a.id, a]));
+    for (const id of ["hat-trick", "comeback", "binge", "short-and-sweet", "tastemaker", "long-haul", "tough-crowd", "people-t1", "moments-t1"]) {
+      expect(byId.get(id)?.earned, id).toBe(true);
+    }
+    expect(byId.get("lunch-break")).toMatchObject({ earned: false, progressLabel: "3 of 5 days" });
+    expect(byId.get("weekend-warrior")).toMatchObject({ earned: false, progressLabel: "1 of 4" });
+    expect(byId.get("full-week")).toMatchObject({ earned: false, progressLabel: "2 of 7 days" });
+    expect(byId.get("moments-t2")).toMatchObject({ earned: false, progressLabel: "12 of 50" });
+    expect(byId.get("anniversary")?.earned).toBe(false);
+  });
+
+  it("finds only the earned badges not already recorded", () => {
+    const list = achievements(data, localDay(new Date(2026, 8, 4)));
+    const fresh = newlyEarned(list, { "first-hour": "2026-09-01T00:00:00Z" }).map((a) => a.id);
+    expect(fresh).toContain("night-owl");
+    expect(fresh).not.toContain("first-hour");
+    expect(fresh).not.toContain("streak-5");
   });
 });

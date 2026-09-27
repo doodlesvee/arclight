@@ -9,7 +9,7 @@ import {
 } from "react";
 import { Toaster } from "@/components/Toaster";
 
-export type ToastVariant = "success" | "error" | "info";
+export type ToastVariant = "success" | "error" | "info" | "achievement";
 
 export type Toast = {
   id: number;
@@ -49,6 +49,8 @@ const DEFAULT_DURATION: Record<ToastVariant, number> = {
   success: 4000,
   info: 5000,
   error: 9000,
+  // Earned, not just confirmed — it can stay a little longer.
+  achievement: 7000,
 };
 
 // Beyond a handful the oldest are unreadable anyway, and a tall stack starts

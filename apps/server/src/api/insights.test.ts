@@ -46,6 +46,20 @@ describe("secondsWatched", () => {
 });
 
 describe("GET /api/insights", () => {
+  it("counts saved bookmarks for the trophy shelf", async () => {
+    const item = await makeItem(libraryId);
+    expect((await insights()).bookmarkCount).toBe(0);
+    for (const positionSeconds of [5, 42]) {
+      await app.inject({
+        method: "POST",
+        url: `/api/media-items/${item}/bookmarks`,
+        headers: { cookie },
+        payload: { positionSeconds },
+      });
+    }
+    expect((await insights()).bookmarkCount).toBe(2);
+  });
+
   it("logs time as the player reports progress", async () => {
     const item = await makeItem(libraryId);
     await put(item, 0);

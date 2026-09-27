@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, Info, Trophy, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Portal } from "./Portal";
 import type { Toast, ToastVariant } from "@/lib/toast";
@@ -7,6 +7,7 @@ const ICONS: Record<ToastVariant, typeof Info> = {
   success: CheckCircle2,
   error: AlertCircle,
   info: Info,
+  achievement: Trophy,
 };
 
 // The page is monochrome by design, so colour is confined to the icon — the
@@ -15,6 +16,8 @@ const ICON_COLOR: Record<ToastVariant, string> = {
   success: "text-emerald-500",
   error: "text-destructive",
   info: "text-muted-foreground",
+  // The Stats page's trophy amber, so an unlock reads as the same medal.
+  achievement: "text-amber-300 animate-trophy-pop",
 };
 
 function ToastRow({
@@ -37,7 +40,15 @@ function ToastRow({
       <Icon className={cn("mt-0.5 size-4 shrink-0", ICON_COLOR[toast.variant])} />
 
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">{toast.title}</p>
+        <p
+          className={cn(
+            "text-sm font-medium",
+            // Badge titles can name a performer or studio.
+            toast.variant === "achievement" && "sensitive",
+          )}
+        >
+          {toast.title}
+        </p>
         {toast.description && (
           <p className="mt-0.5 text-xs text-muted-foreground">
             {toast.description}
