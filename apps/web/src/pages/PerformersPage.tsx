@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, useNavigate } from "@tanstack/react-router";
-import { Heart, LayoutGrid, Share2 } from "lucide-react";
+import { Archive, ChevronRight, Heart, LayoutGrid, Share2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import {
   PerformerCard,
@@ -116,6 +116,9 @@ export function PerformersPage() {
       params: { performerId: String(performer.id) },
     });
   const [letter, setLetter] = useState<string | null>(null);
+  // Folded away by default: archiving is for getting someone out of the
+  // way, so the section shouldn't greet you on every visit.
+  const [showArchived, setShowArchived] = useState(false);
   const [, refreshPins] = useState(0);
 
   useEffect(() => {
@@ -124,10 +127,16 @@ export function PerformersPage() {
     return () => window.removeEventListener(pinsChangedEvent(), refresh);
   }, []);
 
+  // Its own key, not ["performers"]: that one is the active-only list the
+  // home row and the editor share, and caching this longer list under it
+  // would leak archived performers back into them. Still under the prefix,
+  // so every invalidation of ["performers"] refreshes this too.
   const { data } = useQuery({
-    queryKey: ["performers"],
+    queryKey: ["performers", "with-archived"],
     queryFn: () =>
-      fetchJson<{ performers: PerformerSummary[] }>("/api/performers"),
+      fetchJson<{ performers: PerformerSummary[] }>(
+        "/api/performers?archived=include",
+      ),
   });
 
   // Favourites first, then alphabetical — so a performer stays put as their
@@ -140,24 +149,27 @@ export function PerformersPage() {
       .filter((pin) => pin.type === "performer")
       .map((pin) => pin.performerId),
   );
-  const performers = [...(data?.performers ?? [])].sort(
+  const all = [...(data?.performers ?? [])].sort(
     (a, b) =>
       Number(pinnedIds.has(b.id)) - Number(pinnedIds.has(a.id)) ||
       Number(b.isFavorite) - Number(a.isFavorite) ||
       a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
   );
+  const performers = all.filter((p) => !p.archivedAt);
+  const archived = all.filter((p) => p.archivedAt);
 
   // Unlike the homepage row, zero-video performers are kept: this is the page
   // where you'd go to find one you created by hand, or one whose folder is
   // currently unscanned.
   // Favourited performers get their own section at the top, so they're
   // excluded from the two below rather than appearing twice.
-  const visiblePerformers = letter
-    ? performers.filter((performer) => {
-        const initial = performer.name.trim().charAt(0).toUpperCase();
-        return letter === "#" ? !/^[A-Z]$/.test(initial) : initial === letter;
-      })
-    : performers;
+  const matchesLetter = (performer: PerformerSummary) => {
+    if (!letter) return true;
+    const initial = performer.name.trim().charAt(0).toUpperCase();
+    return letter === "#" ? !/^[A-Z]$/.test(initial) : initial === letter;
+  };
+  const visiblePerformers = performers.filter(matchesLetter);
+  const visibleArchived = archived.filter(matchesLetter);
   const visibleFavorites = visiblePerformers.filter((p) => p.isFavorite);
   const visibleWithVideos = visiblePerformers.filter(
     (p) => !p.isFavorite && p.videoCount > 0,
@@ -199,7 +211,7 @@ export function PerformersPage() {
             onChange={setLetter}
             available={performers.map((performer) => performer.name)}
           />
-          {visiblePerformers.length === 0 && (
+          {visiblePerformers.length === 0 && archived.length === 0 && (
             <p className="text-sm text-muted-foreground">
               No performers yet. They're created automatically from your folder
               names when you scan.
@@ -242,6 +254,44 @@ export function PerformersPage() {
                 onOpen={openPerformer}
                 layout={layout}
               />
+            </section>
+          )}
+
+          {visibleArchived.length > 0 && (
+            <section className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setShowArchived((open) => !open)}
+                aria-expanded={showArchived}
+                className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <ChevronRight
+                  className={cn(
+                    "size-3.5 transition-transform",
+                    showArchived && "rotate-90",
+                  )}
+                />
+                <Archive className="size-3.5" />
+                Archived
+                <span className="font-normal tabular-nums">
+                  {visibleArchived.length}
+                </span>
+              </button>
+              {showArchived && (
+                <>
+                  <p className="max-w-prose text-xs text-muted-foreground/70">
+                    Kept out of the home row, search and the network. Their
+                    videos are untouched. Open one to restore them.
+                  </p>
+                  <div className="opacity-60 transition-opacity hover:opacity-100">
+                    <PerformerList
+                      performers={visibleArchived}
+                      onOpen={openPerformer}
+                      layout={layout}
+                    />
+                  </div>
+                </>
+              )}
             </section>
           )}
         </div>

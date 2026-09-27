@@ -73,7 +73,12 @@ function dedupeNames(names: string[]): string[] {
 }
 
 export async function performerRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/api/performers", async () => {
+  // Archived performers are left out unless `archived=include` asks for them
+  // — only the performers page does, to list them in a section of their own.
+  // Everything else that reads this (the home row, the filter bar, the
+  // editor's suggestions) should behave as if they were not there.
+  app.get<{ Querystring: { archived?: string } }>("/api/performers", async (request) => {
+    const includeArchived = request.query.archived === "include";
     const videoTypeIds = db
       .select({ id: mediaItemTypes.id })
       .from(mediaItemTypes)
@@ -84,6 +89,7 @@ export async function performerRoutes(app: FastifyInstance): Promise<void> {
         id: performers.id,
         name: performers.name,
         isFavorite: performers.isFavorite,
+        archivedAt: performers.archivedAt,
         hasImage: sql<boolean>`(${performers.imageFile} is not null)`,
         hasBanner: sql<boolean>`(${performers.bannerFile} is not null)`,
         imagePositionX: performers.imagePositionX,
@@ -112,6 +118,7 @@ export async function performerRoutes(app: FastifyInstance): Promise<void> {
           inArray(mediaItems.itemTypeId, videoTypeIds)
         )
       )
+      .where(includeArchived ? undefined : isNull(performers.archivedAt))
       .groupBy(
         performers.id,
         performers.name,
@@ -146,9 +153,18 @@ export async function performerRoutes(app: FastifyInstance): Promise<void> {
         isNull(mediaItems.missingSince),
         inArray(mediaItems.itemTypeId, videoTypeIds)
       );
+      // Archived performers are not drawn, and neither are the links to
+      // them — an edge to a node that isn't there has nothing to attach to.
+      // Uncorrelated, so it is safe inside queries that are themselves from
+      // performers; it never refers to the outer row.
+      const activePerformerIds = db
+        .select({ id: performers.id })
+        .from(performers)
+        .where(isNull(performers.archivedAt));
       const visibleVideo = and(
         eq(mediaItems.id, mediaItemPerformers.mediaItemId),
-        visibleVideoItem
+        visibleVideoItem,
+        inArray(mediaItemPerformers.performerId, activePerformerIds)
       );
 
       // Inner joins this time: a performer with no videos has nothing to be
@@ -199,7 +215,8 @@ export async function performerRoutes(app: FastifyInstance): Promise<void> {
           otherCredits,
           and(
             eq(otherCredits.mediaItemId, mediaItemPerformers.mediaItemId),
-            sql`${otherCredits.performerId} > ${mediaItemPerformers.performerId}`
+            sql`${otherCredits.performerId} > ${mediaItemPerformers.performerId}`,
+            inArray(otherCredits.performerId, activePerformerIds)
           )
         )
         .groupBy(mediaItemPerformers.performerId, otherCredits.performerId);
@@ -457,6 +474,7 @@ export async function performerRoutes(app: FastifyInstance): Promise<void> {
       hasImage: performer.imageFile !== null,
       hasBanner: performer.bannerFile !== null,
       isFavorite: performer.isFavorite,
+      archivedAt: performer.archivedAt,
       // Detail only, deliberately: a bio is prose, and the performers grid
       // renders every performer as a card that would carry text nothing shows.
       bio: performer.bio,
@@ -636,6 +654,8 @@ export async function performerRoutes(app: FastifyInstance): Promise<void> {
       name?: string;
       bio?: string | null;
       isFavorite?: boolean;
+      /** True archives them now; false brings them back. */
+      archived?: boolean;
       bannerPositionY?: number;
       imagePositionX?: number;
       imagePositionY?: number;
@@ -652,6 +672,7 @@ export async function performerRoutes(app: FastifyInstance): Promise<void> {
       const {
         bio,
         isFavorite,
+        archived,
         bannerPositionY,
         imagePositionX,
         imagePositionY,
@@ -666,6 +687,7 @@ export async function performerRoutes(app: FastifyInstance): Promise<void> {
       const partial: Partial<typeof performers.$inferInsert> = {};
 
       if (isFavorite !== undefined) partial.isFavorite = isFavorite;
+      if (archived !== undefined) partial.archivedAt = archived ? new Date() : null;
 
       if (bio !== undefined) {
         const trimmed = bio?.trim();

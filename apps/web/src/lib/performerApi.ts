@@ -7,6 +7,9 @@ export type PerformerSummary = {
   hasBanner: boolean;
   /** Pins them to the top of the performers page. */
   isFavorite: boolean;
+  /** When they were archived, as an ISO string; null while active. Only the
+   *  performers page asks for archived ones, so elsewhere this is always null. */
+  archivedAt?: string | null;
   videoCount: number;
   representativeItemId: number | null;
   /** Portrait framing. Defaults are 50 / 0 / 100 — centred, top-aligned. */
@@ -399,6 +402,15 @@ export async function setPerformerFavorite(id: number, isFavorite: boolean): Pro
     body: JSON.stringify({ isFavorite }),
   });
   if (!res.ok) throw new Error(`Failed to save favourite: ${res.status}`);
+}
+
+export async function setPerformerArchived(id: number, archived: boolean): Promise<void> {
+  const res = await fetch(`/api/performers/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ archived }),
+  });
+  if (!res.ok) throw new Error(`Failed to save archive: ${res.status}`);
 }
 
 export async function saveBannerPosition(id: number, bannerPositionY: number): Promise<void> {

@@ -211,6 +211,11 @@ export const performers = pgTable(
     // tag or a collection for the same reason items carry one: it's a state
     // you toggle, not a label that belongs in any list.
     isFavorite: boolean("is_favorite").notNull().default(false),
+    // Set when archived: out of the performers grid, the home row, search
+    // suggestions and the network graph, but nothing about them is removed —
+    // their videos keep the credit and their page still opens. A timestamp
+    // rather than a flag so the archived list can say when. Null is active.
+    archivedAt: timestamp("archived_at"),
     imageFile: text("image_file"),
     // Framing for the portrait, the same shape as categories and thumbnails.
     // Defaults centre horizontally and sit near the top, matching the

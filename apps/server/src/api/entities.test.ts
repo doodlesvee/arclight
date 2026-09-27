@@ -119,6 +119,50 @@ describe("performers", () => {
     expect((await get(`/api/performers/${alice}`)).json().isFavorite).toBe(false);
   });
 
+  it("archives a performer out of the list, and brings them back", async () => {
+    const alice = await makePerformer("Alice");
+    await makePerformer("Bella");
+    const names = async (url: string) =>
+      (await get(url)).json().performers.map((p: { name: string }) => p.name);
+
+    expect((await send("PATCH", `/api/performers/${alice}`, { archived: true })).statusCode).toBe(
+      200
+    );
+    expect(await names("/api/performers")).toEqual(["Bella"]);
+    // The performers page asks for them explicitly, to show them apart.
+    const all = (await get("/api/performers?archived=include")).json().performers;
+    expect(all.map((p: { name: string }) => p.name)).toEqual(["Alice", "Bella"]);
+    expect(all[0].archivedAt).not.toBeNull();
+    expect(all[1].archivedAt).toBeNull();
+
+    await send("PATCH", `/api/performers/${alice}`, { archived: false });
+    expect(await names("/api/performers")).toEqual(["Alice", "Bella"]);
+    expect((await get(`/api/performers/${alice}`)).json().archivedAt).toBeNull();
+  });
+
+  it("keeps an archived performer's page, videos and credits intact", async () => {
+    const alice = await makePerformer("Alice");
+    await send("PATCH", `/api/performers/${alice}`, { isFavorite: true });
+    await linkPerformer(await makeItem(libraryId, { title: "Credited" }), alice);
+    await send("PATCH", `/api/performers/${alice}`, { archived: true });
+
+    const detail = (await get(`/api/performers/${alice}`)).json();
+    expect(detail.archivedAt).not.toBeNull();
+    expect(detail.videoCount).toBe(1);
+    // Archiving is not a way of un-favouriting; restoring puts them back
+    // exactly where they were.
+    expect(detail.isFavorite).toBe(true);
+  });
+
+  it("leaves an archived performer out of search suggestions", async () => {
+    const alice = await makePerformer("Alice Archived");
+    await makePerformer("Alice Active");
+    await send("PATCH", `/api/performers/${alice}`, { archived: true });
+
+    const body = (await get("/api/search/suggestions?q=Alice")).json();
+    expect(body.performers.map((p: { name: string }) => p.name)).toEqual(["Alice Active"]);
+  });
+
   it("saves a bio on its own, without re-sending the name", async () => {
     // The partial-update branch used to trigger only on framing fields, so a
     // bio-only PATCH fell through to a path that 400s without a name.

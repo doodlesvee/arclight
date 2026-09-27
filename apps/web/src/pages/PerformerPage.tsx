@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Heart } from "lucide-react";
+import { Archive, ArchiveRestore, Heart } from "lucide-react";
 import { FramingEditor, type FramingValue } from "@/components/FramingEditor";
 import { getRouteApi } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
@@ -23,8 +23,10 @@ import {
   circleStyle,
   saveCircleFraming,
   savePortraitFraming,
+  setPerformerArchived,
   setPerformerFavorite,
 } from "@/lib/performerApi";
+import { useToast } from "@/lib/toast";
 
 const routeApi = getRouteApi("/performer/$performerId");
 
@@ -80,6 +82,29 @@ export function PerformerPage() {
       // re-sort too.
       queryClient.invalidateQueries({ queryKey: ["performers"] });
     },
+  });
+
+  const { toast } = useToast();
+  const archive = useMutation({
+    mutationFn: (next: boolean) => setPerformerArchived(id, next),
+    onSuccess: (_, next) => {
+      queryClient.invalidateQueries({ queryKey: ["performer", id] });
+      // The grid, the home row and the network all leave archived
+      // performers out, and all sit under this prefix.
+      queryClient.invalidateQueries({ queryKey: ["performers"] });
+      toast({
+        title: next ? "Archived" : "Restored",
+        description: next
+          ? "Out of the home row, search and the network. Their videos are untouched."
+          : "Back on the performers page.",
+      });
+    },
+    onError: (error) =>
+      toast({
+        title: "Could not update archive",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "error",
+      }),
   });
 
   const { data: performer, isError } = useQuery({
@@ -206,7 +231,41 @@ export function PerformerPage() {
                   />
                 </button>
               )}
+              {performer && !performer.archivedAt && (
+                <button
+                  type="button"
+                  onClick={() => archive.mutate(true)}
+                  disabled={archive.isPending}
+                  aria-label="Archive performer"
+                  title="Archive — hide from the performers page, home and search"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                >
+                  <Archive className="size-5" />
+                </button>
+              )}
             </div>
+            {performer?.archivedAt && (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 font-medium">
+                  <Archive className="size-3" />
+                  Archived{" "}
+                  {new Date(performer.archivedAt).toLocaleDateString(undefined, {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => archive.mutate(false)}
+                  disabled={archive.isPending}
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
+                >
+                  <ArchiveRestore className="size-3" />
+                  Restore
+                </button>
+              </div>
+            )}
             {/* Gated on `reframing` rather than rendering an empty wrapper on
                 every other view — that wrapper still counted as a flex child
                 and added a gap under the stats you could see but not explain. */}

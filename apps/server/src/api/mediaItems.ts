@@ -921,7 +921,9 @@ export async function mediaItemRoutes(app: FastifyInstance): Promise<void> {
         mediaItems,
         and(eq(mediaItems.id, mediaItemPerformers.mediaItemId), visibleItems())
       )
-      .where(ilike(performers.name, pattern))
+      // Archived performers stay findable through their videos, just not
+      // suggested by name.
+      .where(and(ilike(performers.name, pattern), isNull(performers.archivedAt)))
       .groupBy(
         performers.id,
         performers.name,

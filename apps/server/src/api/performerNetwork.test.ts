@@ -57,6 +57,32 @@ describe("GET /api/performers/network", () => {
     expect(body.nodes.find((n: { id: number }) => n.id === ann).videoCount).toBe(3);
   });
 
+  it("leaves out archived performers and every link to them", async () => {
+    const ann = await makePerformer("Ann");
+    const bea = await makePerformer("Bea");
+    const cat = await makePerformer("Cat");
+    const studio = await makeStudio("Shared");
+    const trio = await makeItem(libraryId, { title: "ABC", studioId: studio });
+    for (const id of [ann, bea, cat]) await linkPerformer(trio, id);
+    await app.inject({
+      method: "PATCH",
+      url: `/api/performers/${cat}`,
+      headers: { cookie },
+      payload: { archived: true },
+    });
+
+    for (const by of ["videos", "studios"]) {
+      const body = (
+        await app.inject({ method: "GET", url: `/api/performers/network?by=${by}`, headers: { cookie } })
+      ).json();
+      expect(body.nodes.map((n: { id: number }) => n.id).sort()).toEqual([ann, bea].sort());
+      for (const e of body.edges as { source: number; target: number }[]) {
+        expect([e.source, e.target]).not.toContain(cat);
+      }
+      expect(body.edges).toHaveLength(1);
+    }
+  });
+
   it("leaves out performers with no videos, and ignores photos", async () => {
     const solo = await makePerformer("Solo");
     await makePerformer("Nobody");
