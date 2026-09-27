@@ -71,7 +71,7 @@ export function PerformerRow() {
           Array.from({ length: 8 }).map((_, index) => (
             <div
               key={`placeholder-${index}`}
-              className="skeleton aspect-[2/3] w-40 shrink-0 rounded-lg sm:w-52"
+              className="skeleton aspect-[2/3] w-34 shrink-0 rounded-lg sm:w-[275px]"
             />
           ))
         : performers.map((performer) => (
@@ -91,7 +91,7 @@ export function PerformerRow() {
         // Matches the portrait tiles it follows: same width rule, same 2:3.
         <SeeMoreTile
           destination={{ to: "/performers" }}
-          className="w-40 shrink-0 sm:w-52"
+          className="w-34 shrink-0 sm:w-[275px]"
           aspectRatio="2 / 3"
         />
       )}

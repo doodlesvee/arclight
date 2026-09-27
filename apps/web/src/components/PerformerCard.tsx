@@ -100,7 +100,7 @@ export function PerformerCard({
         ref={cardRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className="motion-card group relative aspect-[2/3] w-40 shrink-0 overflow-hidden rounded-lg bg-secondary ring-1 ring-border transition-all duration-200 hover:ring-white/40 focus-within:ring-2 focus-within:ring-white sm:w-52"
+        className="motion-card group relative aspect-[2/3] w-34 shrink-0 overflow-hidden rounded-lg bg-secondary ring-1 ring-border transition-all duration-200 hover:ring-white/40 focus-within:ring-2 focus-within:ring-white sm:w-[275px]"
       >
         <button
           type="button"

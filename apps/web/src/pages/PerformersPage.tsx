@@ -73,7 +73,7 @@ function PerformerList({
 }) {
   return (
     <div
-      className="stagger flex flex-wrap"
+      className="stagger flex flex-wrap justify-center"
       style={{ columnGap: layout.columnGapPx, rowGap: layout.rowGapPx }}
     >
       {performers.map((performer) => (
