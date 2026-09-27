@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Star } from "lucide-react";
+import { Star, X } from "lucide-react";
 import { updateItem, type MediaItemDetail } from "@/lib/mediaItemApi";
 import { cn } from "@/lib/utils";
 
 /**
  * Five stars, set in one click.
  *
- * Clicking the rating an item already has clears it, rather than there being
- * a separate "clear" control — the same gesture people reach for on every
- * other star widget, and it keeps this to one row of five targets.
+ * Clicking the rating an item already has clears it — the gesture people
+ * reach for on every other star widget. That gesture is invisible, though,
+ * so a rated item also shows a small × that does the same thing.
  *
  * Not gated behind the sheet's edit mode, for the same reason the favourite
  * heart is not: a rating is a state you set while watching, not metadata you
@@ -87,6 +87,19 @@ export function StarRating({
           />
         </button>
       ))}
+      {rating !== null && (
+        <button
+          type="button"
+          aria-label="Remove rating"
+          title="Remove rating"
+          // Previews the cleared state, as hovering a star previews its rating.
+          onMouseEnter={() => setHovered(0)}
+          onClick={() => mutation.mutate(null)}
+          className="ml-1 rounded p-0.5 text-muted-foreground/60 transition-colors hover:text-foreground"
+        >
+          <X className={size === "md" ? "size-4" : "size-3.5"} />
+        </button>
+      )}
     </span>
   );
 }
