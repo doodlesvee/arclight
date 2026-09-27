@@ -22,6 +22,10 @@ services:
   app:
     build:
       target: deps
+    # Set explicitly rather than inherited from the deps stage's WORKDIR, so
+    # the dev command still finds the workspace if the image on hand happens
+    # to be the production build (whose WORKDIR is /app).
+    working_dir: /repo
     command: npm run dev --workspace apps/server
     environment:
       # See the note at the top of this file. tsx bundles chokidar and reads
