@@ -517,3 +517,77 @@ video.custom-seek::-webkit-media-controls-timeline {
     transform: translate(var(--dx), calc(var(--dy) + 260px)) rotate(var(--rot));
   }
 }
+
+/* Trophy shelf: 3D card flip on click */
+@keyframes badge-flip {
+  0% {
+    transform: perspective(600px) rotateY(0deg);
+  }
+  100% {
+    transform: perspective(600px) rotateY(180deg);
+  }
+}
+@keyframes badge-unflip {
+  0% {
+    transform: perspective(600px) rotateY(180deg);
+  }
+  100% {
+    transform: perspective(600px) rotateY(0deg);
+  }
+}
+
+/* A subtle shine that sweeps across earned medals */
+@keyframes medal-shine {
+  0%,
+  80% {
+    left: -40%;
+    opacity: 0;
+  }
+  90% {
+    opacity: 0.5;
+  }
+  100% {
+    left: 130%;
+    opacity: 0;
+  }
+}
+
+/* Staggered pop-in for badges entering the viewport */
+@keyframes badge-enter {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) translateY(20px);
+  }
+  60% {
+    transform: scale(1.08) translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Animated circular progress ring */
+@keyframes ring-fill {
+  from {
+    stroke-dashoffset: var(--ring-circumference);
+  }
+  to {
+    stroke-dashoffset: var(--ring-offset);
+  }
+}
+
+/* Mini confetti particles that burst from a tapped badge */
+@keyframes badge-confetti {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--cx), var(--cy)) scale(0.4);
+  }
+}
