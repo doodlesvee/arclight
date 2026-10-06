@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
+  FastForward,
   Gauge,
   GripHorizontal,
   Heart,
@@ -52,9 +53,12 @@ import {
 } from "@/lib/mediaItemApi";
 import {
   PLAYBACK_RATES,
+  SKIP_OPTIONS,
   readRate,
+  readSkipSeconds,
   readVolume,
   writeRate,
+  writeSkipSeconds,
   writeVolume,
 } from "@/lib/playerPrefs";
 import { framingStyle, thumbnailUrl } from "@/lib/mediaItemApi";
@@ -118,8 +122,7 @@ function FieldLabel({
 // Throttle for position saves — `timeupdate` fires several times a second.
 const SAVE_INTERVAL_MS = 8000;
 
-/** How far the arrow keys and the skip buttons jump. */
-const SKIP_SECONDS = 10;
+/** How far the arrow keys and the skip buttons jump — read from prefs. */
 
 /**
  * Whether a keystroke belongs to something the user is typing into.
@@ -204,8 +207,10 @@ export function MediaDetailModal({
   // the element imperatively, so React never needs to re-render for them.
   const [rate, setRate] = useState(readRate);
   const [showRates, setShowRates] = useState(false);
+  const [showSkipOptions, setShowSkipOptions] = useState(false);
   const [reframing, setReframing] = useState(false);
   const volumeRef = useRef(readVolume());
+  const skipSeconds = useRef(readSkipSeconds());
   // Metadata is read-only until you ask to edit it. Showing every editor by
   // default filled the panel with empty "Add tag…" style inputs, which read
   // as unfinished rather than as a record of the video.
@@ -457,6 +462,12 @@ export function MediaDetailModal({
     if (videoRef.current) videoRef.current.playbackRate = next;
   }
 
+  function applySkipSeconds(next: number) {
+    skipSeconds.current = next;
+    writeSkipSeconds(next);
+    setShowSkipOptions(false);
+  }
+
   function nudgeVolume(delta: number) {
     const video = videoRef.current;
     if (!video) return;
@@ -607,11 +618,11 @@ export function MediaDetailModal({
           break;
         case "ArrowLeft":
           e.preventDefault();
-          skip(-SKIP_SECONDS);
+          skip(-skipSeconds.current);
           break;
         case "ArrowRight":
           e.preventDefault();
-          skip(SKIP_SECONDS);
+          skip(skipSeconds.current);
           break;
         case "ArrowUp":
           e.preventDefault();
@@ -1079,6 +1090,7 @@ export function MediaDetailModal({
             {mode === "playing" && isVideo && !mini && (
               <>
                 <PlayerGestures
+                  skipSeconds={skipSeconds.current}
                   onSkip={(seconds) => {
                     skip(seconds);
                     revealPlayerControls();
@@ -1314,18 +1326,18 @@ export function MediaDetailModal({
               >
                 <button
                   type="button"
-                  onClick={() => skip(-SKIP_SECONDS)}
-                  aria-label={`Back ${SKIP_SECONDS} seconds`}
-                  title={`Back ${SKIP_SECONDS}s (←)`}
+                  onClick={() => skip(-skipSeconds.current)}
+                  aria-label={`Back ${skipSeconds.current} seconds`}
+                  title={`Back ${skipSeconds.current}s (←)`}
                   className="flex size-9 items-center justify-center rounded-full bg-black/60 backdrop-blur-sm transition-colors hover:bg-black/80"
                 >
                   <RotateCcw className="size-4" />
                 </button>
                 <button
                   type="button"
-                  onClick={() => skip(SKIP_SECONDS)}
-                  aria-label={`Forward ${SKIP_SECONDS} seconds`}
-                  title={`Forward ${SKIP_SECONDS}s (→)`}
+                  onClick={() => skip(skipSeconds.current)}
+                  aria-label={`Forward ${skipSeconds.current} seconds`}
+                  title={`Forward ${skipSeconds.current}s (→)`}
                   className="flex size-9 items-center justify-center rounded-full bg-black/60 backdrop-blur-sm transition-colors hover:bg-black/80"
                 >
                   <RotateCw className="size-4" />
@@ -1356,6 +1368,37 @@ export function MediaDetailModal({
                           )}
                         >
                           {option}×
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowSkipOptions((v) => !v)}
+                    aria-label="Skip interval"
+                    aria-expanded={showSkipOptions}
+                    title="Skip interval"
+                    className="flex h-9 items-center gap-1.5 rounded-full bg-black/60 px-3 text-xs font-medium backdrop-blur-sm transition-colors hover:bg-black/80"
+                  >
+                    <FastForward className="size-4" />
+                    {skipSeconds.current}s
+                  </button>
+                  {showSkipOptions && (
+                    <div className="absolute left-0 top-11 z-10 flex flex-col overflow-hidden rounded-md bg-black/90 py-1 backdrop-blur-sm">
+                      {SKIP_OPTIONS.map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => applySkipSeconds(option)}
+                          className={cn(
+                            "px-4 py-1.5 text-left text-xs transition-colors hover:bg-white/15",
+                            option === skipSeconds.current && "font-semibold text-white",
+                          )}
+                        >
+                          {option}s
                         </button>
                       ))}
                     </div>

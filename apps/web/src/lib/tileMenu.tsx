@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Eye,
   EyeOff,
+  EyeClosed,
   FolderOpen,
   Heart,
   ListPlus,
@@ -16,7 +17,7 @@ import {
 } from "lucide-react";
 import type { ContextMenuEntry, ContextMenuState } from "@/components/ContextMenu";
 import type { MediaCardItem } from "@/components/MediaCard";
-import { updateItem } from "./mediaItemApi";
+import { updateItem, hideItem } from "./mediaItemApi";
 import { useAppearance } from "./appearance";
 import { useCardShortcuts } from "./cardShortcuts";
 import { useQueue, type QueueItem } from "./queue";
@@ -138,6 +139,17 @@ export function useTileMenu({
   const { peek, toggleFavourite, toggleWatched } = useCardShortcuts();
   const { add, addNext } = useQueue();
   const setTileShape = useTileShape();
+  const queryClient = useQueryClient();
+
+  async function hide(item: MediaCardItem) {
+    await hideItem(item.id, true);
+    queryClient.invalidateQueries({ queryKey: ["media-items"] });
+    queryClient.invalidateQueries({ queryKey: ["collection-items"] });
+    queryClient.invalidateQueries({ queryKey: ["continue-watching"] });
+    queryClient.invalidateQueries({ queryKey: ["on-this-day"] });
+    queryClient.invalidateQueries({ queryKey: ["forgotten-gems"] });
+    queryClient.invalidateQueries({ queryKey: ["daily-pick"] });
+  }
 
   function openMenu(event: React.MouseEvent, item: MediaCardItem) {
     event.preventDefault();
@@ -229,6 +241,11 @@ export function useTileMenu({
                     },
                   ]
                 : []),
+              {
+                label: "Hide",
+                icon: EyeClosed,
+                onSelect: () => void hide(item),
+              },
             ]),
       ],
     });

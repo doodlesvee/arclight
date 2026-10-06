@@ -11,6 +11,7 @@ import {
   Clock,
   Coffee,
   Compass,
+  Film,
   Flame,
   Hourglass,
   Lock,
@@ -49,6 +50,8 @@ import {
   type Insights,
   type InsightItem,
   type InsightPerformer,
+  personalRecords,
+  libraryMilestones,
 } from "@/lib/insights";
 import { fetchInsights } from "@/lib/insightsApi";
 import { fetchAchievements } from "@/lib/achievementsApi";
@@ -165,7 +168,19 @@ function StatsStory({
           </Chapter>
         )}
 
-        <Chapter id="trophies" number={hasHistory ? "04" : "03"} title="Trophies" kicker="Achievements">
+        {hasHistory && (
+          <Chapter number="04" title="Personal records" kicker="All-time bests">
+            <Records data={data} onOpenItem={onOpenItem} />
+          </Chapter>
+        )}
+
+        {hasHistory && (
+          <Chapter number="05" title="Your journey" kicker="Library milestones">
+            <MilestonesTimeline data={data} />
+          </Chapter>
+        )}
+
+        <Chapter id="trophies" number={hasHistory ? "06" : "03"} title="Trophies" kicker="Achievements">
           <Trophies list={achievements(data, today)} unlocked={record?.unlocked ?? {}} />
         </Chapter>
       </div>
@@ -1077,7 +1092,67 @@ function Habits({ data, lateShare }: { data: Insights; lateShare: number }) {
   );
 }
 
-// --- 04 Trophies ------------------------------------------------------------
+// --- 04 Records -------------------------------------------------------------
+
+function Records({ data, onOpenItem }: { data: Insights; onOpenItem: (id: number) => void }) {
+  const records = useMemo(() => personalRecords(data), [data]);
+  if (records.length === 0) return null;
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {records.map((record) => (
+        <button
+          key={record.label}
+          type="button"
+          disabled={!record.itemId}
+          onClick={() => record.itemId && onOpenItem(record.itemId)}
+          className={cn(
+            "rounded-xl bg-white/[0.04] p-5 text-left ring-1 ring-white/[0.06] transition-colors",
+            record.itemId && "hover:bg-white/[0.07] cursor-pointer",
+          )}
+        >
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            {record.label}
+          </p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">{record.value}</p>
+          {record.detail && (
+            <p className="mt-1 truncate text-sm text-muted-foreground">{record.detail}</p>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// --- 05 Milestones ----------------------------------------------------------
+
+function MilestonesTimeline({ data }: { data: Insights }) {
+  const milestones = useMemo(() => libraryMilestones(data), [data]);
+  if (milestones.length === 0) return null;
+
+  return (
+    <div className="relative ml-4 border-l border-white/10 pl-8">
+      {milestones.map((m, i) => (
+        <div key={i} className="relative pb-8 last:pb-0">
+          <span className="absolute -left-[calc(2rem+5px)] top-1.5 size-2.5 rounded-full bg-amber-400" />
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            {new Date(m.date + "T12:00").toLocaleDateString(undefined, {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })}
+          </p>
+          <p className="mt-0.5 text-base font-semibold">{m.label}</p>
+          {m.detail && (
+            <p className="mt-0.5 text-sm text-muted-foreground">{m.detail}</p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// --- 06 Trophies ------------------------------------------------------------
 
 const BADGE_ICONS: Record<string, LucideIcon> = {
   "night-owl": Moon,
@@ -1104,6 +1179,8 @@ const FAMILY_ICONS: Record<string, LucideIcon> = {
   explorer: Compass,
   people: Users,
   moments: Bookmark,
+  videos: Film,
+  "active-days": CalendarCheck,
 };
 
 function badgeIcon(badge: Achievement): LucideIcon {

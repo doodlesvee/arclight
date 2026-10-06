@@ -9,6 +9,7 @@ import {
   VIEW_MODES,
 } from "@/lib/layout";
 import {
+  ACCENT_PRESETS,
   BANNER_MAX,
   BANNER_MIN,
   BLUR_MAX,
@@ -81,6 +82,7 @@ export function AppearanceMenu() {
     motion,
     cardRadiusRem,
     typeScale,
+    accentHue,
     discreet,
     discreetBlurPercent,
     discreetText,
@@ -421,6 +423,36 @@ export function AppearanceMenu() {
                 hint="Scales the interface text. For making everything bigger, including the artwork, use your browser's zoom."
                 onChange={(next) => set({ typeScale: next })}
               />
+
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium">Accent color</span>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => set({ accentHue: null })}
+                    className={cn(
+                      "size-7 rounded-full border-2 bg-white transition-transform hover:scale-110",
+                      accentHue === null ? "border-foreground scale-110" : "border-transparent",
+                    )}
+                    aria-label="Default (none)"
+                    title="None"
+                  />
+                  {ACCENT_PRESETS.map((preset) => (
+                    <button
+                      key={preset.hue}
+                      type="button"
+                      onClick={() => set({ accentHue: preset.hue })}
+                      className={cn(
+                        "size-7 rounded-full border-2 transition-transform hover:scale-110",
+                        accentHue === preset.hue ? "border-foreground scale-110" : "border-transparent",
+                      )}
+                      style={{ backgroundColor: `oklch(0.65 0.2 ${preset.hue})` }}
+                      aria-label={preset.label}
+                      title={preset.label}
+                    />
+                  ))}
+                </div>
+              </div>
 
               <Section label="Banner" />
 

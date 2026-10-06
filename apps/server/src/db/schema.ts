@@ -121,6 +121,7 @@ export const mediaItems = pgTable("media_items", {
   seasonNumber: integer("season_number"),
   episodeNumber: integer("episode_number"),
   episodeTitle: text("episode_title"),
+  hiddenAt: timestamp("hidden_at"),
   durationSeconds: integer("duration_seconds"),
   takenAt: timestamp("taken_at"),
   extraMetadata: jsonb("extra_metadata"),

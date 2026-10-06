@@ -234,3 +234,24 @@ export async function setWatched(id: number, watched: boolean): Promise<void> {
   });
   if (!res.ok) throw new Error(`Failed to update watched state: ${res.status}`);
 }
+
+export async function hideItem(id: number, hidden: boolean): Promise<void> {
+  const res = await fetch(`/api/media-items/${id}/hidden`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ hidden }),
+  });
+  if (!res.ok) throw new Error(`Failed to update hidden state: ${res.status}`);
+}
+
+export async function reorderCollectionItems(
+  collectionId: number,
+  orderedIds: number[],
+): Promise<void> {
+  const res = await fetch(`/api/collections/${collectionId}/items/reorder`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderedIds }),
+  });
+  if (!res.ok) throw new Error(`Failed to reorder: ${res.status}`);
+}

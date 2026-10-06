@@ -18,8 +18,8 @@ import { mediaItems } from "../db/schema.js";
  */
 export function visibleItems(): SQL {
   // Non-null assertion is safe and deliberate: `and` only returns undefined
-  // when given no defined conditions, and both of these are constants.
-  return and(eq(mediaItems.inScope, true), isNull(mediaItems.missingSince))!;
+  // when given no defined conditions, and all of these are constants.
+  return and(eq(mediaItems.inScope, true), isNull(mediaItems.missingSince), isNull(mediaItems.hiddenAt))!;
 }
 
 /** Just the "file is still there" half, for queries that scope differently. */

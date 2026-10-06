@@ -281,6 +281,13 @@
       "when": 1790516173417,
       "tag": "0039_performer_archive",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1791216000000,
+      "tag": "0040_hidden_items",
+      "breakpoints": true
     }
   ]
 }

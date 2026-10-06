@@ -13,6 +13,11 @@ import { useAppearance, PageScope } from "@/lib/appearance";
 import { StudioRow } from "@/components/StudioRow";
 import { RecentRow } from "@/components/RecentRow";
 import { PinnedRow } from "@/components/PinnedRow";
+import { StreakWidget } from "@/components/StreakWidget";
+import { TasteTwinRow } from "@/components/TasteTwinRow";
+import { DailyPickCard } from "@/components/DailyPickCard";
+import { OnThisDayCard } from "@/components/OnThisDayCard";
+import { LibraryShowcase } from "@/components/LibraryShowcase";
 
 type Tag = { id: number; name: string };
 type Collection = { id: number; name: string; type: "manual" | "smart" };
@@ -143,6 +148,31 @@ export function HomePage() {
     queryKey: ["continue-watching"],
     queryFn: () => fetchJson<{ items: MediaCardItem[] }>("/api/continue-watching"),
   });
+  const { data: funStat } = useQuery({
+    queryKey: ["fun-stat"],
+    queryFn: () => fetchJson<{ stat: string | null }>("/api/fun-stat"),
+  });
+  const { data: forgottenGems, isLoading: forgottenGemsLoading } = useQuery({
+    queryKey: ["forgotten-gems"],
+    queryFn: () => fetchJson<{ items: MediaCardItem[] }>("/api/forgotten-gems"),
+  });
+  const [dailyPickSeed, setDailyPickSeed] = useState<number | null>(() => {
+    try {
+      const stored = sessionStorage.getItem("dailyPickSeed");
+      return stored ? Number(stored) : null;
+    } catch { return null; }
+  });
+  const { data: dailyPick } = useQuery({
+    queryKey: ["daily-pick", dailyPickSeed],
+    queryFn: () =>
+      fetchJson<{ item: MediaCardItem | null }>(
+        dailyPickSeed != null ? `/api/daily-pick?seed=${dailyPickSeed}` : "/api/daily-pick",
+      ),
+  });
+  const { data: onThisDay, isLoading: onThisDayLoading } = useQuery({
+    queryKey: ["on-this-day"],
+    queryFn: () => fetchJson<{ items: MediaCardItem[] }>("/api/on-this-day"),
+  });
   const { data: tagsData } = useQuery({
     queryKey: ["tags"],
     queryFn: () => fetchJson<{ tags: Tag[] }>("/api/tags"),
@@ -182,6 +212,53 @@ export function HomePage() {
             .filter((row) => row.visible)
             .map(({ key }) => {
               switch (key) {
+                case "libraryShowcase":
+                  return <LibraryShowcase key={key} />;
+                case "funStat":
+                  if (!funStat?.stat) return null;
+                  return (
+                    <p key={key} className="text-sm text-muted-foreground">{funStat.stat}</p>
+                  );
+                case "streak":
+                  return <StreakWidget key={key} />;
+                case "dailyPick":
+                  if (!dailyPick?.item) return null;
+                  return (
+                    <DailyPickCard
+                      key={key}
+                      item={dailyPick.item}
+                      onPlay={() => openItem(dailyPick.item!.id, true)}
+                      onSelect={() => openItem(dailyPick.item!.id, false)}
+                      onRefresh={() => {
+                        const seed = Math.floor(Math.random() * 1_000_000);
+                        setDailyPickSeed(seed);
+                        try { sessionStorage.setItem("dailyPickSeed", String(seed)); } catch {}
+                      }}
+                    />
+                  );
+                case "onThisDay":
+                  return (
+                    <OnThisDayCard
+                      key={key}
+                      items={onThisDay?.items ?? []}
+                      onPlay={(id) => openItem(id, true)}
+                      onSelect={(id) => openItem(id, false)}
+                    />
+                  );
+                case "forgottenGems":
+                  return (
+                    <MediaRow
+                      key={key}
+                      title="Forgotten Gems"
+                      items={withoutFolders(forgottenGems?.items ?? []).slice(0, ROW_TILE_LIMIT)}
+                      loading={forgottenGemsLoading}
+                      onSelectItem={(id) => openItem(id, false)}
+                      onPlayItem={(id) => openItem(id, true)}
+                      onOpenFolder={noopOpenFolder}
+                    />
+                  );
+                case "tasteTwins":
+                  return <TasteTwinRow key={key} />;
                 case "categories":
                   return <KindTiles key={key} />;
                 case "continue":

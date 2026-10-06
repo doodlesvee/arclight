@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { BulkActionBar } from "./BulkActionBar";
 import { MediaCard, type MediaCardItem } from "./MediaCard";
 import { tileWidthPx, useAppearance } from "@/lib/appearance";
@@ -13,6 +13,7 @@ import {
   Eye,
   EyeOff,
   FolderOpen,
+  GripVertical,
   Heart,
   ListPlus,
   ListStart,
@@ -26,6 +27,7 @@ import { Timeline } from "./Timeline";
 import { FilterMenu } from "./FilterBar";
 import { recordRecent } from "@/lib/recent";
 import { setMediaDragData } from "@/lib/dragMedia";
+import { reorderCollectionItems } from "@/lib/mediaItemApi";
 import { isTypingTarget, playItem } from "@/lib/appEvents";
 import { useCardShortcuts } from "@/lib/cardShortcuts";
 import { readPins } from "@/lib/pinned";
@@ -202,6 +204,12 @@ export function MediaGrid({
   const [randomSeed, setRandomSeed] = useState(() =>
     Math.floor(Math.random() * 1_000_000),
   );
+
+  const isCollection = source.type === "collection";
+  const collectionId = isCollection ? source.id : undefined;
+  const queryClient = useQueryClient();
+  const reorderFrom = useRef<number | null>(null);
+  const reorderIndicator = useRef<HTMLElement | null>(null);
 
   const {
     data,
@@ -570,6 +578,70 @@ export function MediaGrid({
       ids: dragging,
       label: dragging.length === 1 ? item.title : `${dragging.length} items`,
     });
+  }
+
+  function startReorderDrag(event: React.DragEvent, item: MediaCardItem) {
+    reorderFrom.current = item.id;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/x-reorder", String(item.id));
+  }
+
+  function handleReorderOver(event: React.DragEvent) {
+    if (!isCollection || reorderFrom.current === null) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    const target = (event.currentTarget as HTMLElement);
+    if (reorderIndicator.current && reorderIndicator.current !== target) {
+      reorderIndicator.current.style.outline = "";
+    }
+    target.style.outline = "2px solid var(--color-primary, #3b82f6)";
+    reorderIndicator.current = target;
+  }
+
+  function handleReorderLeave(event: React.DragEvent) {
+    const target = event.currentTarget as HTMLElement;
+    if (!event.relatedTarget || !target.contains(event.relatedTarget as Node)) {
+      target.style.outline = "";
+      if (reorderIndicator.current === target) reorderIndicator.current = null;
+    }
+  }
+
+  function handleReorderDrop(event: React.DragEvent, targetItem: MediaCardItem) {
+    event.preventDefault();
+    if (reorderIndicator.current) {
+      reorderIndicator.current.style.outline = "";
+      reorderIndicator.current = null;
+    }
+    const fromId = reorderFrom.current;
+    reorderFrom.current = null;
+    if (!fromId || fromId === targetItem.id || !collectionId) return;
+
+    const fromIndex = items.findIndex((i) => i.id === fromId);
+    const toIndex = items.findIndex((i) => i.id === targetItem.id);
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    const newItems = [...items];
+    const [moved] = newItems.splice(fromIndex, 1);
+    newItems.splice(toIndex, 0, moved);
+    const orderedIds = newItems.map((i) => i.id);
+
+    queryClient.setQueryData(
+      ["collection-items", collectionId],
+      (old: { pages: { items: MediaCardItem[]; page: number; pageSize: number; hasMore: boolean }[]; pageParams: number[] } | undefined) => {
+        if (!old) return old;
+        return { ...old, pages: [{ ...old.pages[0], items: newItems }] };
+      },
+    );
+
+    void reorderCollectionItems(collectionId, orderedIds);
+  }
+
+  function handleReorderEnd() {
+    reorderFrom.current = null;
+    if (reorderIndicator.current) {
+      reorderIndicator.current.style.outline = "";
+      reorderIndicator.current = null;
+    }
   }
 
   function queueItemFor(item: MediaCardItem): QueueItem {
@@ -955,9 +1027,8 @@ export function MediaGrid({
             >
               {row.map((item, column) => {
                 const index = virtualRow.index * columns + column;
-                return (
+                const card = (
                   <MediaCard
-                    key={item.id}
                     item={item}
                     gridIndex={index}
                     tabIndex={index === safeTabStop ? 0 : -1}
@@ -965,11 +1036,31 @@ export function MediaGrid({
                     onContextMenu={(event) =>
                       openContextMenu(event, item, index)
                     }
-                    onDragStart={(event) => startDrag(event, item)}
+                    onDragStart={isCollection
+                      ? (event) => startReorderDrag(event, item)
+                      : (event) => startDrag(event, item)}
                     selectable={selectionMode}
                     selected={selectedIds.has(item.id)}
                   />
                 );
+                if (isCollection) {
+                  return (
+                    <div
+                      key={item.id}
+                      className="relative rounded-md transition-shadow"
+                      onDragOver={handleReorderOver}
+                      onDragLeave={handleReorderLeave}
+                      onDrop={(e) => handleReorderDrop(e, item)}
+                      onDragEnd={handleReorderEnd}
+                    >
+                      <div className="absolute -left-1 top-1 z-10 flex cursor-grab items-center rounded bg-black/50 p-0.5 text-white opacity-0 backdrop-blur-sm transition-opacity hover:opacity-100 group-hover:opacity-100 [div:hover>&]:opacity-100">
+                        <GripVertical className="size-3.5" />
+                      </div>
+                      {card}
+                    </div>
+                  );
+                }
+                return <React.Fragment key={item.id}>{card}</React.Fragment>;
               })}
             </div>
           );

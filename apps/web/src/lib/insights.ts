@@ -474,6 +474,16 @@ export function achievements(data: Insights, today: string): Achievement[] {
       ["moments-t2", "Scrapbooker", "Save 50 bookmarks.", 50],
       ["moments-t3", "Archivist", "Save 100 bookmarks.", 100],
     ]),
+    ...tiers("videos", finished.length, count_, [
+      ["videos-t1", "Getting started", "Finish 10 videos.", 10],
+      ["videos-t2", "Triple digits", "Finish 100 videos.", 100],
+      ["videos-t3", "Half a thousand", "Finish 500 videos.", 500],
+    ]),
+    ...tiers("active-days", activeDays.length, days_, [
+      ["active-t1", "Regular", "Watch on 10 different days.", 10],
+      ["active-t2", "Dedicated", "Watch on 50 different days.", 50],
+      ["active-t3", "Devotee", "Watch on 100 different days.", 100],
+    ]),
     flag("night-owl", "Night owl", "Watch between midnight and 4 am.", localHours.some((h) => h < 4)),
     flag("early-bird", "Early bird", "Watch between 5 and 7 am.", localHours.some((h) => h >= 5 && h < 7)),
     goal("lunch-break", "Lunch break", "Watch during the noon hour on five different days.", lunchDays, 5, days_),
@@ -607,6 +617,192 @@ export function funFacts(log: WatchLogEntry[]): FunFacts {
     lateNightShare: total > 0 ? late / total : 0,
     videosWatched: new Set(log.map((entry) => entry.mediaItemId)).size,
   };
+}
+
+export type PersonalRecord = {
+  label: string;
+  value: string;
+  detail: string | null;
+  itemId: number | null;
+};
+
+export function personalRecords(data: Insights): PersonalRecord[] {
+  const days = secondsByDay(data.log);
+  const records: PersonalRecord[] = [];
+
+  const bestDayEntry = [...days.entries()].reduce<[string, number] | null>(
+    (best, entry) => (!best || entry[1] > best[1] ? entry : best),
+    null,
+  );
+  if (bestDayEntry) {
+    const [day, seconds] = bestDayEntry;
+    records.push({
+      label: "Biggest day",
+      value: formatWatchTime(seconds),
+      detail: new Date(day + "T12:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }),
+      itemId: null,
+    });
+  }
+
+  const mostRewatched = data.items.reduce<(typeof data.items)[number] | null>(
+    (best, item) => (!best || item.playCount > best.playCount ? item : best),
+    null,
+  );
+  if (mostRewatched && mostRewatched.playCount > 1) {
+    records.push({
+      label: "Most rewatched",
+      value: `${mostRewatched.playCount} plays`,
+      detail: mostRewatched.title,
+      itemId: mostRewatched.id,
+    });
+  }
+
+  const { longest, longestEnded } = streaks(days, localDay(new Date()));
+  if (longest > 0) {
+    records.push({
+      label: "Longest streak",
+      value: `${longest} day${longest !== 1 ? "s" : ""}`,
+      detail: longestEnded
+        ? `ended ${new Date(longestEnded + "T12:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}`
+        : null,
+      itemId: null,
+    });
+  }
+
+  const finishesByDay = new Map<string, number>();
+  for (const item of data.items) {
+    if (!item.completedAt) continue;
+    const day = localDay(new Date(item.completedAt));
+    finishesByDay.set(day, (finishesByDay.get(day) ?? 0) + 1);
+  }
+  const bestFinishEntry = [...finishesByDay.entries()].reduce<[string, number] | null>(
+    (best, entry) => (!best || entry[1] > best[1] ? entry : best),
+    null,
+  );
+  if (bestFinishEntry && bestFinishEntry[1] > 1) {
+    const [day, count] = bestFinishEntry;
+    records.push({
+      label: "Most in a day",
+      value: `${count} videos`,
+      detail: new Date(day + "T12:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }),
+      itemId: null,
+    });
+  }
+
+  const topPerformer = data.performers.reduce<(typeof data.performers)[number] | null>(
+    (best, p) => (!best || p.finishedCount > best.finishedCount ? p : best),
+    null,
+  );
+  if (topPerformer && topPerformer.finishedCount > 0) {
+    records.push({
+      label: "Top performer",
+      value: `${topPerformer.finishedCount} finished`,
+      detail: topPerformer.name,
+      itemId: null,
+    });
+  }
+
+  const topStudio = data.studios.reduce<(typeof data.studios)[number] | null>(
+    (best, s) => (!best || s.finishedCount > best.finishedCount ? s : best),
+    null,
+  );
+  if (topStudio && topStudio.finishedCount > 0) {
+    records.push({
+      label: "Top studio",
+      value: `${topStudio.finishedCount} finished`,
+      detail: topStudio.name,
+      itemId: null,
+    });
+  }
+
+  return records;
+}
+
+export type Milestone = {
+  date: string;
+  label: string;
+  detail: string | null;
+};
+
+export function libraryMilestones(data: Insights): Milestone[] {
+  const milestones: Milestone[] = [];
+  const days = secondsByDay(data.log);
+
+  const sorted = data.items
+    .filter((item) => item.completedAt)
+    .sort((a, b) => a.completedAt!.localeCompare(b.completedAt!));
+
+  if (sorted.length > 0) {
+    milestones.push({
+      date: sorted[0].completedAt!.slice(0, 10),
+      label: "First video finished",
+      detail: sorted[0].title,
+    });
+  }
+
+  const watchedThresholds = [10, 50, 100, 250, 500, 1000];
+  for (const n of watchedThresholds) {
+    if (sorted.length >= n) {
+      milestones.push({
+        date: sorted[n - 1].completedAt!.slice(0, 10),
+        label: `${n}${n >= 1000 ? "" : ordinalSuffix(n)} video finished`,
+        detail: sorted[n - 1].title,
+      });
+    }
+  }
+
+  const firstRated = data.items
+    .filter((item) => item.rating != null && item.completedAt)
+    .sort((a, b) => a.completedAt!.localeCompare(b.completedAt!))[0];
+  if (firstRated) {
+    milestones.push({
+      date: firstRated.completedAt!.slice(0, 10),
+      label: "First rating given",
+      detail: `${firstRated.title} — ${"★".repeat(firstRated.rating!)}`,
+    });
+  }
+
+  const bestDayEntry = [...days.entries()].reduce<[string, number] | null>(
+    (best, e) => (!best || e[1] > best[1] ? e : best),
+    null,
+  );
+  if (bestDayEntry && bestDayEntry[1] >= 3600) {
+    milestones.push({
+      date: bestDayEntry[0],
+      label: "Biggest single day",
+      detail: formatWatchTime(bestDayEntry[1]),
+    });
+  }
+
+  let cumulativeSeconds = 0;
+  const hourThresholds = [100, 500, 1000];
+  const logByDay = [...days.entries()].sort(([a], [b]) => a.localeCompare(b));
+  for (const [day, seconds] of logByDay) {
+    cumulativeSeconds += seconds;
+    const hours = cumulativeSeconds / 3600;
+    for (const threshold of hourThresholds) {
+      if (hours >= threshold && hours - seconds / 3600 < threshold) {
+        milestones.push({
+          date: day,
+          label: `${threshold} hours watched`,
+          detail: null,
+        });
+      }
+    }
+  }
+
+  milestones.sort((a, b) => a.date.localeCompare(b.date));
+  return milestones;
+}
+
+function ordinalSuffix(n: number): string {
+  if (n % 100 >= 11 && n % 100 <= 13) return "th";
+  switch (n % 10) {
+    case 1: return "st";
+    case 2: return "nd";
+    case 3: return "rd";
+    default: return "th";
+  }
 }
 
 export function formatWatchTime(seconds: number): string {

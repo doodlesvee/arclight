@@ -3,7 +3,6 @@ import { RotateCcw, RotateCw } from "lucide-react";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 
-const SKIP_SECONDS = 10;
 /** Taps closer together than this are one gesture. */
 const MULTI_TAP_MS = 320;
 
@@ -32,9 +31,11 @@ type Side = "back" | "forward";
 export function PlayerGestures({
   onSkip,
   onTap,
+  skipSeconds = 10,
 }: {
   onSkip: (seconds: number) => void;
   onTap: () => void;
+  skipSeconds?: number;
 }) {
   const coarse = useMediaQuery("(pointer: coarse)");
   const last = useRef<{ side: Side; at: number } | null>(null);
@@ -53,10 +54,10 @@ export function PlayerGestures({
     onTap();
     if (!continuing) return;
 
-    onSkip(side === "forward" ? SKIP_SECONDS : -SKIP_SECONDS);
+    onSkip(side === "forward" ? skipSeconds : -skipSeconds);
     setFlash((current) => ({
       side,
-      seconds: (current?.side === side ? current.seconds : 0) + SKIP_SECONDS,
+      seconds: (current?.side === side ? current.seconds : 0) + skipSeconds,
       key: now,
     }));
     if (flashTimer.current) clearTimeout(flashTimer.current);

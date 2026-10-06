@@ -13,9 +13,12 @@
 
 const VOLUME_KEY = "player-volume";
 const RATE_KEY = "player-rate";
+const SKIP_KEY = "player-skip-seconds";
 
 /** Rates offered in the speed menu. 1 must be one of them — it's the default. */
 export const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
+
+export const SKIP_OPTIONS = [5, 10, 15, 30] as const;
 
 function read(key: string): string | null {
   try {
@@ -59,4 +62,13 @@ export function readRate(): number {
 
 export function writeRate(rate: number): void {
   write(RATE_KEY, String(rate));
+}
+
+export function readSkipSeconds(): number {
+  const raw = Number(read(SKIP_KEY));
+  return (SKIP_OPTIONS as readonly number[]).includes(raw) ? raw : 10;
+}
+
+export function writeSkipSeconds(seconds: number): void {
+  write(SKIP_KEY, String(seconds));
 }

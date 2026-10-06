@@ -29,9 +29,16 @@ import {
  */
 export const HOME_ROWS = [
   { key: "categories", label: "Categories" },
+  { key: "funStat", label: "Fun stat of the day" },
+  { key: "streak", label: "Watch streak" },
+  { key: "dailyPick", label: "Daily pick" },
+  { key: "onThisDay", label: "On this day" },
+  { key: "forgottenGems", label: "Forgotten gems" },
+  { key: "tasteTwins", label: "You might like" },
   { key: "continue", label: "Continue watching" },
   { key: "favourites", label: "Favourites" },
   { key: "performers", label: "Performers" },
+  { key: "libraryShowcase", label: "Library showcase" },
   { key: "studios", label: "Studios" },
   { key: "recent", label: "Recently added" },
   { key: "recentlyWatched", label: "Recently watched" },
@@ -50,9 +57,11 @@ export type HomeRowKey = (typeof HOME_ROWS)[number]["key"];
 /** An ordered list; anything missing from it is hidden. */
 export type HomeRowSetting = { key: HomeRowKey; visible: boolean };
 
+const HIDDEN_BY_DEFAULT = new Set<HomeRowKey>(["streak"]);
+
 const DEFAULT_HOME_ROWS: HomeRowSetting[] = HOME_ROWS.map((row) => ({
   key: row.key,
-  visible: true,
+  visible: !HIDDEN_BY_DEFAULT.has(row.key),
 }));
 
 /**
@@ -203,6 +212,17 @@ export const RADIUS_MAX = 1.5;
 export const TYPE_SCALE_MIN = 0.85;
 export const TYPE_SCALE_MAX = 1.3;
 
+export const ACCENT_PRESETS: { label: string; hue: number }[] = [
+  { label: "Blue", hue: 250 },
+  { label: "Purple", hue: 290 },
+  { label: "Pink", hue: 340 },
+  { label: "Red", hue: 25 },
+  { label: "Orange", hue: 55 },
+  { label: "Yellow", hue: 85 },
+  { label: "Green", hue: 145 },
+  { label: "Teal", hue: 185 },
+];
+
 export type Appearance = {
   /**
    * Tile size as a percentage of the widest a tile goes — one number drives
@@ -337,6 +357,8 @@ export type Appearance = {
   cardRadiusRem: number;
   /** Multiplies every font size. 1 is the designed scale. */
   typeScale: number;
+  /** Hue for the accent color (0–360), or null for the default monochrome. */
+  accentHue: number | null;
   /** Which homepage sections show, and in what order. */
   homeRows: HomeRowSetting[];
   /**
@@ -422,6 +444,7 @@ export const DEFAULTS: Appearance = {
   motion: "full",
   cardRadiusRem: 0.625,
   typeScale: 1,
+  accentHue: null,
   homeRows: DEFAULT_HOME_ROWS,
   pageOverrides: {},
 };
@@ -584,6 +607,10 @@ function read(): Appearance {
         TYPE_SCALE_MAX,
         DEFAULTS.typeScale,
       ),
+      accentHue:
+        typeof parsed.accentHue === "number" && Number.isFinite(parsed.accentHue)
+          ? ((parsed.accentHue % 360) + 360) % 360
+          : null,
       homeRows: readHomeRows(parsed.homeRows),
       pageOverrides: readPageOverrides(parsed.pageOverrides),
     };
@@ -765,6 +792,20 @@ export function AppearanceProvider({
     root.style.setProperty("--radius", `${value.cardRadiusRem}rem`);
     root.style.setProperty("--type-scale", String(value.typeScale));
   }, [value.cardRadiusRem, value.typeScale]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (value.accentHue !== null) {
+      const h = value.accentHue;
+      root.style.setProperty("--primary", `oklch(0.75 0.18 ${h})`);
+      root.style.setProperty("--primary-foreground", `oklch(0.15 0.03 ${h})`);
+      root.style.setProperty("--ring", `oklch(0.6 0.15 ${h})`);
+    } else {
+      root.style.setProperty("--primary", "oklch(0.98 0 0)");
+      root.style.setProperty("--primary-foreground", "oklch(0.14 0 0)");
+      root.style.setProperty("--ring", "oklch(0.7 0 0)");
+    }
+  }, [value.accentHue]);
 
   // Discreet mode is a single attribute on <html> rather than a prop threaded
   // through every component that renders an image. There are dozens of those —

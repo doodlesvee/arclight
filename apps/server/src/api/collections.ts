@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, max, sql } from "drizzle-orm";
 import { visibleItems } from "../library/visibility.js";
 import type { FastifyInstance } from "fastify";
 import { compileSmartRule, smartRuleError, type SmartRule } from "../collections/ruleCompiler.js";
@@ -102,26 +102,21 @@ export async function collectionRoutes(app: FastifyInstance): Promise<void> {
         .from(mediaItems)
         .innerJoin(mediaItemTypes, eq(mediaItems.itemTypeId, mediaItemTypes.id));
 
-      // Both branches must sort before they page: an unordered LIMIT/OFFSET
-      // lets Postgres return rows in a different order per call, which shows
-      // up as items duplicated on one page and missing from the next. The id
-      // breaks ties between rows created in the same scan instant.
-      const order = [desc(mediaItems.createdAt), desc(mediaItems.id)];
+      const defaultOrder = [desc(mediaItems.createdAt), desc(mediaItems.id)];
 
-      // One row past the page size, so "is there more?" needs no COUNT(*).
       let rows;
       if (collection.type === "manual") {
         rows = await baseQuery
           .innerJoin(collectionItems, eq(collectionItems.mediaItemId, mediaItems.id))
           .where(and(eq(collectionItems.collectionId, id), visibleItems()))
-          .orderBy(...order)
+          .orderBy(asc(collectionItems.position), ...defaultOrder)
           .limit(PAGE_SIZE + 1)
           .offset((pageNum - 1) * PAGE_SIZE);
       } else {
         const rule = collection.smartRule as SmartRule;
         rows = await baseQuery
           .where(and(compileSmartRule(rule), visibleItems()))
-          .orderBy(...order)
+          .orderBy(...defaultOrder)
           .limit(PAGE_SIZE + 1)
           .offset((pageNum - 1) * PAGE_SIZE);
       }
@@ -157,9 +152,14 @@ export async function collectionRoutes(app: FastifyInstance): Promise<void> {
         return { error: "Cannot manually add items to a smart collection" };
       }
 
+      const [{ nextPos }] = await db
+        .select({ nextPos: sql<number>`coalesce(max(${collectionItems.position}), 0) + 1` })
+        .from(collectionItems)
+        .where(eq(collectionItems.collectionId, collectionId));
+
       await db
         .insert(collectionItems)
-        .values({ collectionId, mediaItemId })
+        .values({ collectionId, mediaItemId, position: nextPos })
         .onConflictDoNothing();
 
       reply.code(201);
@@ -178,6 +178,43 @@ export async function collectionRoutes(app: FastifyInstance): Promise<void> {
             eq(collectionItems.mediaItemId, Number(request.params.mediaItemId))
           )
         );
+      return { ok: true };
+    }
+  );
+
+  app.put<{ Params: { id: string }; Body: { orderedIds: number[] } }>(
+    "/api/collections/:id/items/reorder",
+    async (request, reply) => {
+      const collectionId = Number(request.params.id);
+      const { orderedIds } = request.body;
+
+      const [collection] = await db
+        .select()
+        .from(collections)
+        .where(eq(collections.id, collectionId));
+      if (!collection) {
+        reply.code(404);
+        return { error: "Not found" };
+      }
+      if (collection.type !== "manual") {
+        reply.code(400);
+        return { error: "Cannot reorder a smart collection" };
+      }
+
+      await db.transaction(async (tx) => {
+        for (let i = 0; i < orderedIds.length; i++) {
+          await tx
+            .update(collectionItems)
+            .set({ position: i })
+            .where(
+              and(
+                eq(collectionItems.collectionId, collectionId),
+                eq(collectionItems.mediaItemId, orderedIds[i]),
+              ),
+            );
+        }
+      });
+
       return { ok: true };
     }
   );
