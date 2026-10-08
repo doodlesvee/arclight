@@ -43,19 +43,26 @@ export async function registerPasskey(label: string): Promise<void> {
     // The server sends the existing credentials as `excludeCredentials`, and
     // the authenticator refuses to enrol twice. That's correct behaviour, but
     // "The authenticator was previously registered" reads like a fault.
-    if (error instanceof Error && error.name === "InvalidStateError") {
+    const isAuthenticatorError = error instanceof Error || error instanceof DOMException;
+    if (isAuthenticatorError && error.name === "InvalidStateError") {
       throw new Error("This browser is already set up — it's in the list above.");
     }
-    // Anything else is a cancelled prompt or a finger that didn't read.
-    throw new Error("Touch ID didn't complete. Try again.");
+    if (isAuthenticatorError) {
+      throw new Error(`Touch ID setup failed (${error.name}): ${error.message}`, {
+        cause: error,
+      });
+    }
+    throw new Error("Touch ID setup failed with an unknown authenticator error.", {
+      cause: error,
+    });
   }
 
   await post("/api/webauthn/register", { response, label });
 }
 
 /** Resolves true when the fingerprint checked out; false when it was declined. */
-export async function authenticatePasskey(): Promise<boolean> {
-  const options = (await post("/api/webauthn/auth/options")) as Parameters<
+export async function authenticatePasskey(purpose: "privacy" | "vault" = "privacy"): Promise<boolean> {
+  const options = (await post("/api/webauthn/auth/options", { purpose })) as Parameters<
     typeof startAuthentication
   >[0]["optionsJSON"];
   let response;
@@ -66,8 +73,36 @@ export async function authenticatePasskey(): Promise<boolean> {
     // as one — the password field is still sitting there.
     return false;
   }
-  await post("/api/webauthn/auth", { response });
+  await post("/api/webauthn/auth", { response, purpose });
   return true;
+}
+
+export async function unlockVaultWithPasskey(): Promise<void> {
+  if (!window.isSecureContext || !window.PublicKeyCredential) {
+    throw new Error("Passkey unlock needs a supported browser on localhost or HTTPS.");
+  }
+  if (!(await authenticatePasskey("vault"))) {
+    throw new Error("Passkey unlock did not complete. Try again or use your PIN.");
+  }
+}
+
+export async function loginWithPasskey(): Promise<void> {
+  if (!window.isSecureContext || !window.PublicKeyCredential) {
+    throw new Error("Passkey sign-in needs a supported browser on localhost or HTTPS.");
+  }
+  const options = (await post("/api/webauthn/login/options")) as Parameters<
+    typeof startAuthentication
+  >[0]["optionsJSON"];
+  let response;
+  try {
+    response = await startAuthentication({ optionsJSON: options });
+  } catch (error) {
+    const detail = error instanceof Error || error instanceof DOMException
+      ? error.message
+      : "Unknown authenticator error";
+    throw new Error(`Passkey sign-in did not complete: ${detail}`, { cause: error });
+  }
+  await post("/api/webauthn/login", { response });
 }
 
 export async function deletePasskey(id: string): Promise<void> {

@@ -36,7 +36,6 @@ import { bookmarkRoutes } from "./api/bookmarks.js";
 import { storageRoutes } from "./api/storage.js";
 import { castRoutes } from "./api/cast.js";
 import { inboxRoutes } from "./api/inbox.js";
-import { duelRoutes } from "./api/duels.js";
 import { vaultRoutes } from "./api/vault.js";
 import { insightsRoutes } from "./api/insights.js";
 import { achievementRoutes } from "./api/achievements.js";
@@ -92,7 +91,7 @@ export async function buildApp({
   });
 
   await app.register(swagger, {
-    openapi: { info: { title: "Media Server API", version: "0.0.1" } },
+    openapi: { info: { title: "ArcLight API", version: "0.0.1" } },
   });
   await app.register(swaggerUi, { routePrefix: "/api/docs" });
 
@@ -144,7 +143,6 @@ export async function buildApp({
   await app.register(storageRoutes);
   await app.register(castRoutes);
   await app.register(inboxRoutes);
-  await app.register(duelRoutes);
   await app.register(vaultRoutes);
   await app.register(insightsRoutes);
   await app.register(achievementRoutes);

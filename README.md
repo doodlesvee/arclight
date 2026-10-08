@@ -1,4 +1,4 @@
-# media-server
+# ArcLight
 
 A self-hosted media library for a personal video collection, built around one
 idea: **your filesystem is the source of truth, and no metadata ever comes from
@@ -9,20 +9,14 @@ and titles from how the files are named and filed, and gives you a browsable
 library over the top. Nothing is looked up externally, nothing is uploaded, and
 the files themselves are opened read-only.
 
-## Why not Jellyfin
+## Built around your collection
 
-Jellyfin is excellent at what it does. This exists because of three things it
-does differently:
-
-- **Libraries are type-locked.** A library is "Movies" or "TV" or "Photos", and
-  content can't mix. Here there is one library with a polymorphic `media_items`
-  table, so videos, photos and folders coexist and grouping is user-driven.
-- **Naming conventions are rigid, and getting them wrong means no metadata.**
-  Here the conventions are yours: the scanner reads what it can, never fails a
-  file, and never blocks on identifying anything.
-- **Organising means fighting the scraper.** With no external source there is
-  nothing to fight. The scanner owns a field until you edit it, then it stops
-  touching it — permanently.
+- **One library for mixed media.** Videos, photos and folders share a single
+  library, with categories and collections you define.
+- **Your naming conventions.** The scanner reads what it can from paths and
+  filenames without requiring an external match to add an item.
+- **Your edits take priority.** The scanner owns a field until you edit it,
+  then preserves your changes on subsequent scans.
 
 ## What it does
 
@@ -33,6 +27,7 @@ does differently:
 - **Generates** poster frames and multi-segment hover previews with ffmpeg
 - **Organises** with tags, favourites, 1–5 star ratings, categories, manual
   and rule-based collections, and saved searches
+  Ratings are set directly; there is no pairwise video-ranking feature.
 - **Edits in bulk**: select any number of tiles to favourite, rate, tag, set
   a studio, add or remove a performer, or file them into a collection
 - **Groups** by performer, studio, album and series, each with its own
@@ -54,6 +49,8 @@ does differently:
   your library after a few idle minutes (never over a playing video)
 - **Adapts** to how you like it drawn, without a rebuild — see
   [Appearance](#appearance)
+- **Fills the homepage's bottom backdrop** with a darkened collage of up to
+  48 newest video thumbnails, refreshed every 30 seconds while the page is open.
 - **Casts** to a Chromecast or smart TV from Chrome, or AirPlay from Safari —
   see [Casting to a TV](#casting-to-a-tv)
 - **Shows where the space goes** — Site settings → Storage: the library's
@@ -234,38 +231,33 @@ matter if you're running the server directly on the host (`npm run dev
 --workspace apps/server`) rather than through Docker; the Docker path hardcodes
 its own values for these inside the compose file.
 
-### Using it like an app
+### Using ArcLight in a browser
 
-On a Mac, build a launcher once:
+Start Docker, then build and start the server:
 
 ```bash
-make mac-app
+make up
 ```
 
-That creates `~/Applications/Private Server.app`. Open it once from Spotlight,
-then right-click its Dock icon → Options → Keep in Dock. Clicking it:
+Open <http://localhost:3000> in your browser. ArcLight does not require a
+desktop launcher or an installed browser app. Use Chrome for Chromecast;
+Touch ID uses the browser's passkey support.
+Registered passkeys can also sign you in: choose **Sign in with passkey** on
+the login screen. Register one first under Site settings → Privacy while
+signed in with your password. Passkeys require localhost or HTTPS; password
+sign-in remains available as a fallback.
 
-1. starts Docker Desktop if it isn't running,
-2. starts the app's containers (the very first start builds the image and takes a
-   few minutes),
-3. waits until the server answers, and
-4. opens the app in its own Chrome window — no tabs, no address bar.
+The vault also supports **Unlock with passkey** after you set its PIN and
+register a passkey. PIN unlock remains available as a fallback. A vault
+passkey check unlocks only the current session's vault, not other privacy
+actions; leaving the vault page or choosing **Lock now** locks it again.
 
-Closing the window leaves the server running; `make down` stops it. To skip the
-wait, turn on Docker Desktop → Settings → General → *Start Docker Desktop when
-you sign in*: the containers restart on their own, so the window opens at once.
+Closing the browser leaves the server running; `make down` stops it.
+Docker Desktop can optionally start at sign-in so the existing containers
+restart with Docker.
 
-- It needs Google Chrome (Chromium, Edge and Brave also work). Without one it
-  opens your default browser instead, which will look like a normal tab.
-- The launcher points at this folder, so run `make mac-app` again if you move it.
-  Delete the `.app` to remove it.
-- While the window is open the Dock shows Chrome's icon, not the launcher's.
-- `make app` does the same from a terminal, on macOS or Linux.
-- Chrome can also install the app itself (the install icon in the address bar,
-  or *Add to Home Screen* on a phone). That gives a window with its own icon, but it
-  cannot start the server — the launcher can.
-- The icons are drawn by `node scripts/make-icons.mjs`; the results are committed,
-  so you only run it after changing the design.
+The browser icons are drawn by `node scripts/make-icons.mjs`; the results are
+committed, so you only run it after changing the design.
 
 ### Using it from a phone
 

@@ -123,6 +123,7 @@ export const mediaItems = pgTable("media_items", {
   episodeTitle: text("episode_title"),
   hiddenAt: timestamp("hidden_at"),
   triagedAt: timestamp("triaged_at"),
+  // Retained for existing databases and backups after removing the Duels feature.
   duelScore: integer("duel_score").notNull().default(1000),
   duelCount: integer("duel_count").notNull().default(0),
   durationSeconds: integer("duration_seconds"),
@@ -477,6 +478,7 @@ export const watchLog = pgTable(
   ],
 );
 
+// Historical records only; no routes read or write this table.
 export const duels = pgTable(
   "duels",
   {

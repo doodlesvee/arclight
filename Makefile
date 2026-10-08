@@ -12,7 +12,7 @@ COMPOSE := docker compose -f docker/docker-compose.yml
 DEV := $(COMPOSE) -f docker/docker-compose.dev.yml
 
 .DEFAULT_GOAL := help
-.PHONY: help up app mac-app build down restart logs ps shell dev dev-down reset
+.PHONY: help up build down restart logs ps shell dev dev-down reset
 
 help: ## Show this list
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  make %-10s %s\n", $$1, $$2}'
@@ -20,12 +20,6 @@ help: ## Show this list
 up: ## Build if needed and start the app on http://localhost:3000
 	$(LAN) $(COMPOSE) up -d --build
 	@echo "Running at http://localhost:$${APP_PORT:-3000}"
-
-app: ## Start if needed and open the app in its own window (no browser tabs)
-	@sh scripts/launch.sh
-
-mac-app: ## Build "Private Server.app" (macOS) to keep in your Dock
-	@sh scripts/macos/build-app.sh
 
 build: ## Rebuild the image from scratch, ignoring the cache
 	$(COMPOSE) build --no-cache

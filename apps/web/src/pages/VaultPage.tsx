@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, Lock, LockOpen } from "lucide-react";
+import { Eye, Fingerprint, Lock, LockOpen } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { settingsInputClass } from "@/components/SettingsSection";
 import { openDetails } from "@/lib/appEvents";
@@ -14,6 +14,7 @@ import {
   unlockVault,
 } from "@/lib/vaultApi";
 import { formatDuration } from "@/lib/utils";
+import { fetchPasskeys, unlockVaultWithPasskey } from "@/lib/webauthnApi";
 
 function PinForm({
   title,
@@ -23,6 +24,7 @@ function PinForm({
   pending,
   error,
   onSubmit,
+  onPasskey,
 }: {
   title: string;
   hint: string;
@@ -31,6 +33,7 @@ function PinForm({
   pending: boolean;
   error: string | null;
   onSubmit: (pin: string, accountPassword: string) => void;
+  onPasskey?: () => void;
 }) {
   const [pin, setPin] = useState("");
   const [accountPassword, setAccountPassword] = useState("");
@@ -79,6 +82,17 @@ function PinForm({
       >
         {submitLabel}
       </button>
+      {onPasskey && (
+        <button
+          type="button"
+          onClick={onPasskey}
+          disabled={pending}
+          className="flex w-full items-center justify-center gap-2 rounded-md bg-secondary px-3 py-2 text-sm font-semibold transition-colors hover:bg-accent disabled:opacity-50"
+        >
+          <Fingerprint className="size-4" />
+          Unlock with passkey
+        </button>
+      )}
     </form>
   );
 }
@@ -211,6 +225,11 @@ function Unlocked({ count }: { count: number | null }) {
 export function VaultPage() {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["vault"], queryFn: fetchVault });
+  const passkeys = useQuery({ queryKey: ["passkeys"], queryFn: fetchPasskeys });
+  const passkeyUnlock = useMutation({
+    mutationFn: unlockVaultWithPasskey,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vault"] }),
+  });
 
   const unlock = useMutation({
     mutationFn: ({ pin }: { pin: string }) => unlockVault(pin),
@@ -253,12 +272,22 @@ export function VaultPage() {
         ) : !data.unlocked ? (
           <PinForm
             title="Vault locked"
-            hint="Enter your PIN to see what is hidden."
+            hint="Use your PIN or a registered passkey to see what is hidden."
             withAccountPassword={false}
             submitLabel="Unlock"
-            pending={unlock.isPending}
-            error={unlock.error ? describePinError(unlock.error) : null}
-            onSubmit={(pin) => unlock.mutate({ pin })}
+            pending={unlock.isPending || passkeyUnlock.isPending}
+            error={passkeyUnlock.error?.message
+              ?? (unlock.error ? describePinError(unlock.error) : null)
+              ?? passkeys.error?.message
+              ?? null}
+            onSubmit={(pin) => {
+              passkeyUnlock.reset();
+              unlock.mutate({ pin });
+            }}
+            onPasskey={passkeys.data?.length ? () => {
+              unlock.reset();
+              passkeyUnlock.mutate();
+            } : undefined}
           />
         ) : (
           <Unlocked count={data.count} />

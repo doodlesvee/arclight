@@ -8,7 +8,6 @@ import {
   FolderOpen,
   Home,
   Inbox,
-  Swords,
   Lock,
   Images,
   Layers,
@@ -251,7 +250,7 @@ export function Sidebar({
           <Clapperboard className="size-5 shrink-0" />
           {!collapsed && (
             <span className="truncate text-base font-bold tracking-tight">
-              Private Server
+              ArcLight
             </span>
           )}
         </div>
@@ -343,15 +342,6 @@ export function Sidebar({
           {!collapsed && "Series"}
         </Link>
         <InboxLink collapsed={collapsed} navItemClass={navItemClass} />
-        <Link
-          to="/duels"
-          className={navItemClass}
-          title={collapsed ? "Duels" : undefined}
-          activeProps={{ className: "bg-accent text-foreground font-medium" }}
-        >
-          <Swords className="size-4 shrink-0" />
-          {!collapsed && "Duels"}
-        </Link>
         <Link
           to="/vault"
           className={navItemClass}

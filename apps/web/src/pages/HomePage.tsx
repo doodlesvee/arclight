@@ -17,7 +17,7 @@ import { StreakWidget } from "@/components/StreakWidget";
 import { TasteTwinRow } from "@/components/TasteTwinRow";
 import { DailyPickCard } from "@/components/DailyPickCard";
 import { OnThisDayCard } from "@/components/OnThisDayCard";
-import { LibraryShowcase } from "@/components/LibraryShowcase";
+import { HomeThumbnailCollage } from "@/components/HomeThumbnailCollage";
 
 type Tag = { id: number; name: string };
 type Collection = { id: number; name: string; type: "manual" | "smart" };
@@ -212,8 +212,6 @@ export function HomePage() {
             .filter((row) => row.visible)
             .map(({ key }) => {
               switch (key) {
-                case "libraryShowcase":
-                  return <LibraryShowcase key={key} />;
                 case "funStat":
                   if (!funStat?.stat) return null;
                   return (
@@ -409,6 +407,8 @@ export function HomePage() {
               }
             })}
         </div>
+
+        <HomeThumbnailCollage />
 
         {open && (
           <MediaDetailModal itemId={open.id} autoPlay={open.autoPlay} onClose={() => setOpen(null)} />

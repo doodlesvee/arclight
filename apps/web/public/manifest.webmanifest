@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Private Server",
-  "short_name": "Private",
+  "name": "ArcLight",
+  "short_name": "ArcLight",
   "description": "A private personal media library.",
   "start_url": "/",
   "scope": "/",

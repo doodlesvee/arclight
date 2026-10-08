@@ -15,6 +15,8 @@ const PUBLIC_API_PATHS = new Set([
   "/api/auth/setup",
   "/api/auth/login",
   "/api/auth/logout",
+  "/api/webauthn/login/options",
+  "/api/webauthn/login",
   "/api/health",
 ]);
 

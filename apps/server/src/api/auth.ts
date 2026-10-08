@@ -41,7 +41,7 @@ function recordFailure(ip: string): void {
   entry.count += 1;
 }
 
-function setSessionCookie(reply: FastifyReply, sessionId: string, secure: boolean): void {
+export function setSessionCookie(reply: FastifyReply, sessionId: string, secure: boolean): void {
   reply.setCookie(SESSION_COOKIE, sessionId, {
     path: "/",
     // The cookie is never read by JavaScript, so httpOnly costs nothing and

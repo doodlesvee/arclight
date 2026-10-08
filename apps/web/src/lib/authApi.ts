@@ -60,5 +60,6 @@ export function changePassword(currentPassword: string, newPassword: string) {
 }
 
 export async function logout(): Promise<void> {
-  await fetch("/api/auth/logout", { method: "POST" });
+  const res = await fetch("/api/auth/logout", { method: "POST" });
+  if (!res.ok) throw new Error(`Failed to sign out: ${res.status}`);
 }

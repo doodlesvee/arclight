@@ -11,7 +11,6 @@ import { BrowsePage } from "@/pages/BrowsePage";
 import { HelpPage } from "@/pages/HelpPage";
 import { HomePage } from "@/pages/HomePage";
 import { InboxPage } from "@/pages/InboxPage";
-import { DuelsPage } from "@/pages/DuelsPage";
 import { VaultPage } from "@/pages/VaultPage";
 import { MissingPage } from "@/pages/MissingPage";
 import { PerformerPage } from "@/pages/PerformerPage";
@@ -187,12 +186,6 @@ const inboxRoute = createRoute({
   component: InboxPage,
 });
 
-const duelsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/duels",
-  component: DuelsPage,
-});
-
 const vaultRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/vault",
@@ -242,7 +235,6 @@ const routeTree = rootRoute.addChildren([
   studiosRoute,
   studioRoute,
   inboxRoute,
-  duelsRoute,
   vaultRoute,
   missingRoute,
   helpRoute,

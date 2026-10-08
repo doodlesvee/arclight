@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LogOut, UserRound } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import { fetchAuthStatus, logout } from "@/lib/authApi";
+import { fetchAuthStatus, logout, type AuthStatus } from "@/lib/authApi";
+import { useToast } from "@/lib/toast";
 
 /**
  * Account avatar in the header, with a sign-out menu.
@@ -15,14 +16,30 @@ export function UserMenu() {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: auth } = useQuery({ queryKey: ["auth-status"], queryFn: fetchAuthStatus });
 
   const signOut = useMutation({
     mutationFn: logout,
-    // Drops every cached query along with the session, so no data from the
-    // previous login is sitting in memory behind the login screen.
-    onSuccess: () => queryClient.clear(),
+    onSuccess: async () => {
+      // Keep the auth query's observers attached so AuthGate sees the logout.
+      // Cancel requests first so a stale response cannot restore the session.
+      await queryClient.cancelQueries();
+      queryClient.removeQueries({
+        predicate: (query) => query.queryKey[0] !== "auth-status",
+      });
+      queryClient.setQueryData<AuthStatus>(["auth-status"], {
+        needsSetup: false,
+        user: null,
+      });
+      setOpen(false);
+    },
+    onError: (error) => toast({
+      title: "Could not sign out",
+      description: error.message,
+      variant: "error",
+    }),
   });
 
   useEffect(() => {

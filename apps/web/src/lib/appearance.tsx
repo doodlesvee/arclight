@@ -38,7 +38,6 @@ export const HOME_ROWS = [
   { key: "continue", label: "Continue watching" },
   { key: "favourites", label: "Favourites" },
   { key: "performers", label: "Performers" },
-  { key: "libraryShowcase", label: "Library showcase" },
   { key: "studios", label: "Studios" },
   { key: "recent", label: "Recently added" },
   { key: "recentlyWatched", label: "Recently watched" },

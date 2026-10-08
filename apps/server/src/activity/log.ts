@@ -16,7 +16,6 @@ export type ActivityType =
   | "tag"
   | "performer"
   | "hide"
-  | "duel"
   | "vault";
 
 export async function logActivity(

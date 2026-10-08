@@ -55,6 +55,7 @@ export function AppShell({
   const [miniPlayer, setMiniPlayer] = useState(false);
   const [resumePlayer, setResumePlayer] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [scrolled, setScrolled] = useState(() => window.scrollY > 0);
   // Keying the main region on the path re-runs its entry animation on every
   // navigation, so pages fade in rather than snapping into place.
   const pathname = useRouterState({
@@ -64,6 +65,13 @@ export function AppShell({
   useEffect(() => {
     setDrawerRequested(false);
   }, [pathname]);
+
+  useEffect(() => {
+    const updateScrolled = () => setScrolled(window.scrollY > 0);
+    updateScrolled();
+    window.addEventListener("scroll", updateScrolled, { passive: true });
+    return () => window.removeEventListener("scroll", updateScrolled);
+  }, []);
 
   // The drawer sits over the page, so the page behind it must not scroll.
   useEffect(() => {
@@ -156,7 +164,10 @@ export function AppShell({
       <div className="flex min-w-0 flex-1 flex-col">
         {/* The search field used to hold the centre column; with search on
             ⌘K there's nothing to centre, so the header is just its actions. */}
-        <header className="cinema-hide focus-hide sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-border bg-background/85 px-4 py-3 backdrop-blur-md md:justify-end md:gap-4 md:px-6">
+        <header className={cn(
+          "cinema-hide focus-hide sticky top-0 z-30 -mb-[60px] flex h-[60px] shrink-0 items-center justify-between gap-2 px-4 py-3 transition-colors md:justify-end md:gap-4 md:px-6",
+          scrolled ? "bg-background" : "bg-transparent",
+        )}>
           {/* On phones the sidebar is behind a button, so the header carries
               the only way to reach it — and the page title with it. */}
           <div className="flex min-w-0 items-center gap-2 md:hidden">
@@ -170,7 +181,7 @@ export function AppShell({
               <Menu className="size-5" />
             </button>
             <span className="truncate text-sm font-semibold tracking-tight">
-              {title ?? "Private Server"}
+              {title ?? "ArcLight"}
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-1.5 md:gap-3">
@@ -190,7 +201,10 @@ export function AppShell({
         </header>
 
         {focusMode && (
-          <div className="animate-toolbar-in sticky top-0 z-30 flex items-center gap-2 border-b border-border/70 bg-background/90 px-4 py-2 backdrop-blur-md">
+          <div className={cn(
+            "animate-toolbar-in sticky top-0 z-30 -mb-12 flex h-12 shrink-0 items-center gap-2 px-4 py-2 transition-colors",
+            scrolled ? "bg-background" : "bg-transparent",
+          )}>
             <button
               type="button"
               onClick={() => window.history.back()}
@@ -236,7 +250,8 @@ export function AppShell({
           // on a different axis to its own content reads as a mistake.
           <div
             className={cn(
-              "px-4 pt-5 md:px-6 md:pt-6",
+              "px-4 md:px-6",
+              focusMode ? "pt-[68px] md:pt-[72px]" : "pt-20 md:pt-[84px]",
               // With the h1 hidden on a phone, a page that has only a title
               // would leave this as bare padding — a gap under the header
               // with nothing in it.

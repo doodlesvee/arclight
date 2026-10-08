@@ -4,7 +4,7 @@
 //
 // The outputs are committed, so this only has to run when the design changes.
 // The glyph is the clapperboard from lucide (the one in the sidebar), drawn on
-// the app's dark background.
+// a colorful gradient.
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,7 +13,6 @@ import sharp from "sharp";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const publicDir = path.join(root, "apps/web/public");
 const iconsDir = path.join(publicDir, "icons");
-const iconsetDir = path.join(root, "scripts/macos/AppIcon.iconset");
 
 const GLYPH = [
   "m12.296 3.464 3.02 3.956",
@@ -25,23 +24,30 @@ const GLYPH = [
 /**
  * An icon on a 512 canvas.
  *
- * `inset` is the transparent margin around the rounded square (macOS wants
- * one, so the icon sits in the Dock like the system's own); `radius` rounds
- * it, and 0 gives the full-bleed square that maskable and iOS icons need —
+ * `radius` rounds the square, and 0 gives the full-bleed square that
+ * maskable and iOS icons need —
  * the platform applies its own mask. `glyph` is the glyph's size as a share of
  * the canvas; maskable icons keep it inside the central safe zone.
  */
-function svg({ inset = 0, radius = 0, glyph = 0.58 }) {
+function svg({ inset = 0, radius = 0, glyph = 0.58, colorful = false }) {
   const size = 512 - inset * 2;
   const scale = (512 * glyph) / 24;
   const offset = (512 - 24 * scale) / 2;
   const paths = GLYPH.map((d) => `<path d="${d}"/>`).join("");
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+  const background = colorful
+    ? `<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#06b6d4"/>
+      <stop offset="0.35" stop-color="#2563eb"/>
+      <stop offset="0.7" stop-color="#9333ea"/>
+      <stop offset="1" stop-color="#f43f5e"/>
+    </linearGradient>`
+    : `<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#2b2b30"/>
       <stop offset="1" stop-color="#141414"/>
-    </linearGradient>
+    </linearGradient>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    ${background}
   </defs>
   <rect x="${inset}" y="${inset}" width="${size}" height="${size}" rx="${radius}" fill="url(#bg)"/>
   <g transform="translate(${offset} ${offset}) scale(${scale})" fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths}</g>
@@ -49,9 +55,8 @@ function svg({ inset = 0, radius = 0, glyph = 0.58 }) {
 `;
 }
 
-const rounded = svg({ radius: 112 });
-const macos = svg({ inset: 52, radius: 96, glyph: 0.46 });
-const fullBleed = svg({ glyph: 0.5 });
+const rounded = svg({ radius: 112, colorful: true });
+const fullBleed = svg({ glyph: 0.5, colorful: true });
 
 async function png(source, size, file) {
   await sharp(Buffer.from(source), { density: 384 })
@@ -61,7 +66,6 @@ async function png(source, size, file) {
 }
 
 mkdirSync(iconsDir, { recursive: true });
-mkdirSync(iconsetDir, { recursive: true });
 
 writeFileSync(path.join(iconsDir, "icon.svg"), rounded);
 // The tab and window icon, so it matches the installed one.
@@ -72,10 +76,4 @@ await png(rounded, 512, path.join(iconsDir, "icon-512.png"));
 await png(fullBleed, 512, path.join(iconsDir, "icon-maskable-512.png"));
 await png(fullBleed, 180, path.join(iconsDir, "apple-touch-icon.png"));
 
-// The sizes `iconutil` expects in an .iconset.
-for (const base of [16, 32, 128, 256, 512]) {
-  await png(macos, base, path.join(iconsetDir, `icon_${base}x${base}.png`));
-  await png(macos, base * 2, path.join(iconsetDir, `icon_${base}x${base}@2x.png`));
-}
-
-console.log("Icons written to", path.relative(root, iconsDir), "and", path.relative(root, iconsetDir));
+console.log("Icons written to", path.relative(root, iconsDir));
