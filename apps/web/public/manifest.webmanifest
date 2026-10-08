@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "name": "Private Server",
   "short_name": "Private",
   "description": "A private personal media library.",
@@ -7,10 +8,27 @@
   "display": "standalone",
   "background_color": "#141414",
   "theme_color": "#141414",
-  "orientation": "landscape",
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"

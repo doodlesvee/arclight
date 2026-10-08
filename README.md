@@ -191,15 +191,29 @@ Requires Docker and Docker Compose.
 ```bash
 git clone git@github.com:doodlesvee/media-server.git
 cd media-server
-cp .env.example docker/.env      # then edit it — see below
-npm run start:docker
+make up
 ```
 
-Open <http://localhost:3000>. The first screen creates your account; there is
-no default login.
+(`make up` is `docker compose -f docker/docker-compose.yml up -d --build` plus a lookup of this machine's
+address for the phone link in Settings. `make` on its own lists the other
+commands: `down`, `restart`, `logs`, `ps`, `dev`, `reset`.)
 
-Everything after the clone runs through Docker; nothing needs to be installed
-on the host.
+Open <http://localhost:3000>. The first screen creates your account; there is
+no default login. Then add your video folders under Settings → Library; the
+folder picker starts at your home folder.
+
+That is the whole setup. ffmpeg, the database and everything else are inside
+the containers, so nothing needs to be installed on the host and no `.env` file
+is needed. Port 3000 taken? Start it with `APP_PORT=3001 make up`.
+
+Settings shows the address to open on your phone because `make up` looks up
+this machine's wifi address and passes it in. Create `docker/.env`
+from `.env.example` only if you want to change one of the settings below.
+
+If you instead run the server directly on your machine (`npm run dev`, for
+development), ffmpeg and ffprobe must be installed there — `brew install ffmpeg`
+on macOS, `sudo apt install ffmpeg` on Debian/Ubuntu. Without them videos still
+scan, but get no thumbnail, preview or duration.
 
 ### Configuration
 
@@ -208,17 +222,50 @@ on the host.
 | Variable | Meaning | Default |
 |---|---|---|
 | `MEDIA_ROOT` | Your library, mounted **read-only** | `./media-placeholder` |
-| `HOME_ROOT` | What the in-app folder browser may look at, read-only | `/Users` |
+| `HOME_ROOT` | What the in-app folder browser may look at, read-only | your home folder |
 | `BACKUP_DIR` | The one writable mount. Backups are written here, and anything you drop in is offered for restore | `../backups` |
 | `COMPOSE_FILE` | Which compose files a bare `docker compose` picks up | — |
 | `WEBAUTHN_ORIGIN` | Where the browser thinks it is, for Touch ID. Comma-separated; all must share a hostname | `http://localhost:5173,http://localhost:3000` |
-| `LAN_HOST` | This machine's address on the wifi, so Settings can show the URL to open on a phone. Detected automatically by the npm scripts; set it to override | detected |
+| `LAN_HOST` | This machine's address on the wifi, so Settings can show the URL to open on a phone. Filled in for you when you start through `docker/with-lan-host.sh`; set it to override | detected |
 | `LAN_PORT` | The port that URL uses — the one a phone actually opens | `5173` in dev, `3000` in production |
 
 `.env.example` also has `DATABASE_URL`, `PORT` and `APP_DATA_DIR` — those only
-matter if you're running the server directly on the host (`npm run
-dev:server`) rather than through Docker; the Docker path hardcodes its own
-values for these inside the compose file.
+matter if you're running the server directly on the host (`npm run dev
+--workspace apps/server`) rather than through Docker; the Docker path hardcodes
+its own values for these inside the compose file.
+
+### Using it like an app
+
+On a Mac, build a launcher once:
+
+```bash
+make mac-app
+```
+
+That creates `~/Applications/Private Server.app`. Open it once from Spotlight,
+then right-click its Dock icon → Options → Keep in Dock. Clicking it:
+
+1. starts Docker Desktop if it isn't running,
+2. starts the app's containers (the very first start builds the image and takes a
+   few minutes),
+3. waits until the server answers, and
+4. opens the app in its own Chrome window — no tabs, no address bar.
+
+Closing the window leaves the server running; `make down` stops it. To skip the
+wait, turn on Docker Desktop → Settings → General → *Start Docker Desktop when
+you sign in*: the containers restart on their own, so the window opens at once.
+
+- It needs Google Chrome (Chromium, Edge and Brave also work). Without one it
+  opens your default browser instead, which will look like a normal tab.
+- The launcher points at this folder, so run `make mac-app` again if you move it.
+  Delete the `.app` to remove it.
+- While the window is open the Dock shows Chrome's icon, not the launcher's.
+- `make app` does the same from a terminal, on macOS or Linux.
+- Chrome can also install the app itself (the install icon in the address bar,
+  or *Add to Home Screen* on a phone). That gives a window with its own icon, but it
+  cannot start the server — the launcher can.
+- The icons are drawn by `node scripts/make-icons.mjs`; the results are committed,
+  so you only run it after changing the design.
 
 ### Using it from a phone
 
@@ -241,9 +288,8 @@ it genuinely sealed off, publish the port to loopback only — `127.0.0.1:5173:5
 in the compose file — and nothing from the network reaches the container at all.
 
 A container can only see its own address on the Docker bridge, which is no use
-to a phone, so `npm run dev:docker` and `npm run start:docker` look up this
-machine's wifi address as they start (`docker/with-lan-host.sh`) and pass it
-in. Settings then shows the URL for the phone, with a **Show QR** button that
+to a phone, so `docker/with-lan-host.sh` — run in front of your `docker compose`
+command — looks up this machine's wifi address as it starts and passes it in. Settings then shows the URL for the phone, with a **Show QR** button that
 opens it as a code to scan with the phone's camera. If you move to another
 network, starting again picks up the new address.
 
@@ -292,7 +338,7 @@ other request from the network is still refused.
 Runs the server and Vite in containers with the source bind-mounted:
 
 ```bash
-npm run dev:docker
+sh docker/with-lan-host.sh docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up -d --build
 ```
 
 The web app is then on <http://localhost:5173>, proxying `/api` to the server.
@@ -303,10 +349,13 @@ The web app is then on <http://localhost:5173>, proxying `/api` to the server.
 > CPU while dev mode is running. The same limitation is why library scanning
 > is interval-based rather than using a file watcher.
 
-`npm run docker:down` tears everything down regardless of which mode you
-started — it always references both compose files plus `--remove-orphans`,
-so a `web` container left over from dev mode is caught even if you only
-started (or only tear down against) the base file.
+To tear everything down regardless of which mode you started, name both
+compose files and add `--remove-orphans`, so a `web` container left over from
+dev mode is caught even if you only started the base file:
+
+```bash
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml down --remove-orphans
+```
 
 `node_modules` is a named volume rather than part of the bind mount, so the
 host's copy (built for the host's OS and architecture) can't shadow the
@@ -559,7 +608,7 @@ wrote it so that case can be caught up front.
 it's in that folder:
 
 1. `git clone`, and copy the `.tar.gz` into `backups/`.
-2. Point `MEDIA_ROOT` at the videos and `docker compose up`.
+2. Point `MEDIA_ROOT` at the videos and run `make up`.
 3. Create any account — it's thrown away in a moment — to get past the
    first-run screen.
 4. Site settings → Backup → **Restore** on that archive.

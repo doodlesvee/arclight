@@ -22,7 +22,7 @@
 
 // Bumped whenever the shell changes shape. The build fingerprints its own
 // assets, so this only has to change when this file's own logic does.
-const CACHE = "media-server-shell-v1";
+const CACHE = "media-server-shell-v2";
 
 const SHELL = ["/", "/index.html", "/favicon.svg", "/manifest.webmanifest"];
 
