@@ -1,3 +1,4 @@
+import { Flame } from "lucide-react";
 import { useRef, useState } from "react";
 import {
   formatTimestamp,
@@ -34,6 +35,7 @@ export function SeekStrip({
   heatmap,
   visible,
   onSeek,
+  onJumpToBest,
   besidePanel = false,
 }: {
   duration: number;
@@ -43,6 +45,8 @@ export function SeekStrip({
   heatmap?: number[];
   visible: boolean;
   onSeek: (seconds: number) => void;
+  /** Jumps to the most replayed part; the button only shows once there is one. */
+  onJumpToBest?: () => void;
   /** The queue is open over the right of the frame; stop short of it. */
   besidePanel?: boolean;
 }) {
@@ -115,6 +119,18 @@ export function SeekStrip({
         shown ? "opacity-100" : "pointer-events-none opacity-0",
       )}
     >
+      {onJumpToBest && heatmapMax > 1 && (
+        <button
+          type="button"
+          onClick={onJumpToBest}
+          title="Jump to the most replayed part (H)"
+          className="absolute bottom-full right-0 mb-8 flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-medium text-white ring-1 ring-white/20 backdrop-blur transition-colors hover:bg-black/85"
+        >
+          <Flame className="size-3 text-orange-400" />
+          Best part
+        </button>
+      )}
+
       {hover && (
         <div
           className="pointer-events-none absolute bottom-5 flex -translate-x-1/2 flex-col items-center gap-1"

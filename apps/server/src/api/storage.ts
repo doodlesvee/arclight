@@ -1,6 +1,8 @@
+import path from "node:path";
 import { sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { db } from "../db/client.js";
+import { libraryRoots } from "../db/schema.js";
 
 type GroupRow = {
   id: number | null;
@@ -25,6 +27,16 @@ type PerformerRow = GroupRow & {
 const TOP_GROUPS = 10;
 const LARGEST_LIMIT = 15;
 const COPY_GROUP_LIMIT = 20;
+/** Folders shown as their own block before the rest fold together. */
+const TREEMAP_FOLDER_LIMIT = 60;
+
+export type TreemapNode = {
+  name: string;
+  /** Null for blocks that are not a folder you can open. */
+  path: string | null;
+  bytes: number;
+  files: number;
+};
 
 /**
  * Height bands, matching the resolution filter's (see RESOLUTIONS in
@@ -318,6 +330,102 @@ export async function storageRoutes(app: FastifyInstance): Promise<void> {
           .reduce((sum, item) => sum + item.bytes, 0);
         return { studio: group.studio, releaseDate: group.release_date, items, reclaimableBytes };
       }),
+    };
+  });
+  /**
+   * One level of the folder tree, sized by what is on disk.
+   *
+   * Computed from the paths the scanner recorded rather than by walking the
+   * disk, so it is quick and agrees with the library's own file counts. With no
+   * `path` it returns the watched folders themselves; with one, that folder's
+   * subfolders, and the loose files directly inside it as a single block.
+   */
+  app.get<{ Querystring: { path?: string } }>("/api/storage/treemap", async (request, reply) => {
+    const roots = (await db.select({ path: libraryRoots.path }).from(libraryRoots)).map(
+      (r) => r.path,
+    );
+
+    const rootSize = async (rootPath: string) => {
+      const prefix = rootPath.endsWith("/") ? rootPath : rootPath + "/";
+      const result = await db.execute<{ files: number; bytes: string }>(sql`
+        select count(*)::int as files, coalesce(sum(mf.size_bytes), 0)::bigint as bytes
+        from media_files mf
+        join media_items mi on mi.id = mf.media_item_id
+        where starts_with(mf.path, ${prefix}::text)
+          and mi.in_scope = true and mi.missing_since is null
+      `);
+      const row = result.rows[0];
+      return { files: row?.files ?? 0, bytes: Number(row?.bytes ?? 0) };
+    };
+
+    const requested = request.query.path;
+    if (!requested) {
+      const nodes: TreemapNode[] = [];
+      for (const rootPath of roots) {
+        nodes.push({ name: rootPath, path: rootPath, ...(await rootSize(rootPath)) });
+      }
+      nodes.sort((a, b) => b.bytes - a.bytes);
+      return {
+        path: null,
+        parent: null,
+        nodes: nodes.filter((n) => n.bytes > 0),
+        totalBytes: nodes.reduce((sum, n) => sum + n.bytes, 0),
+      };
+    }
+
+    const target = path.posix.normalize(requested).replace(/\/+$/, "");
+    const insideRoot = roots.some((r) => target === r || target.startsWith(r + "/"));
+    if (!insideRoot) {
+      reply.code(400);
+      return { error: "That folder isn't one of the watched folders" };
+    }
+
+    const prefix = target + "/";
+    const result = await db.execute<{
+      segment: string;
+      is_dir: boolean;
+      files: number;
+      bytes: string;
+    }>(sql`
+      select
+        split_part(substr(mf.path, length(${prefix}::text) + 1), '/', 1) as segment,
+        (position('/' in substr(mf.path, length(${prefix}::text) + 1)) > 0) as is_dir,
+        count(*)::int as files,
+        coalesce(sum(mf.size_bytes), 0)::bigint as bytes
+      from media_files mf
+      join media_items mi on mi.id = mf.media_item_id
+      where starts_with(mf.path, ${prefix}::text)
+        and mi.in_scope = true and mi.missing_since is null
+      group by segment, is_dir
+      order by bytes desc
+    `);
+
+    const folders: TreemapNode[] = [];
+    let loose = { files: 0, bytes: 0 };
+    for (const row of result.rows) {
+      const bytes = Number(row.bytes);
+      if (row.is_dir) {
+        folders.push({ name: row.segment, path: prefix + row.segment, bytes, files: row.files });
+      } else {
+        loose = { files: loose.files + row.files, bytes: loose.bytes + bytes };
+      }
+    }
+
+    const shown = folders.slice(0, TREEMAP_FOLDER_LIMIT);
+    const rest = folders.slice(TREEMAP_FOLDER_LIMIT).reduce(
+      (sum, f) => ({ files: sum.files + f.files, bytes: sum.bytes + f.bytes }),
+      { files: 0, bytes: 0 },
+    );
+
+    const nodes: TreemapNode[] = [...shown];
+    if (rest.files > 0) nodes.push({ name: "Smaller folders", path: null, ...rest });
+    if (loose.files > 0) nodes.push({ name: "Files in this folder", path: null, ...loose });
+
+    return {
+      path: target,
+      parent: roots.includes(target) ? null : path.posix.dirname(target),
+      nodes: nodes.filter((n) => n.bytes > 0),
+      totalBytes: nodes.reduce((sum, n) => sum + n.bytes, 0),
     };
   });
 }

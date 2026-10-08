@@ -62,6 +62,7 @@ import {
   writeVolume,
 } from "@/lib/playerPrefs";
 import { framingStyle, thumbnailUrl } from "@/lib/mediaItemApi";
+import { bestPartSeconds } from "@/lib/heatmap";
 import { cardChrome, TILE_SHAPES } from "@/lib/layout";
 import { cn, formatDuration } from "@/lib/utils";
 import { useUndoable } from "@/lib/undo";
@@ -341,6 +342,7 @@ export function MediaDetailModal({
   });
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const bestPartRef = useRef<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const playerAreaRef = useRef<HTMLDivElement>(null);
   const cast = useCast(videoRef, viewingId, isVideo && mode === "playing", `${mode}-${viewingId}`);
@@ -571,6 +573,17 @@ export function MediaDetailModal({
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
+  bestPartRef.current = bestPartSeconds(
+    heatmapData?.buckets,
+    item?.durationSeconds ?? videoRef.current?.duration ?? 0,
+  );
+
+  function jumpToBestPart() {
+    if (bestPartRef.current === null) return;
+    seekTo(bestPartRef.current);
+    void videoRef.current?.play().catch(() => {});
+  }
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       // Escape closes even from inside an input — it's the way out of a
@@ -613,6 +626,7 @@ export function MediaDetailModal({
         e.key !== "c" &&
         e.key !== "i" &&
         e.key !== "b" &&
+        e.key !== "h" &&
         !isDigitKey(e.key)
       )
         return;
@@ -656,6 +670,9 @@ export function MediaDetailModal({
           break;
         case "b":
           addBookmark();
+          break;
+        case "h":
+          jumpToBestPart();
           break;
         default:
           // 0–9 jump to that tenth of the video, as on YouTube: 5 is
@@ -1115,6 +1132,7 @@ export function MediaDetailModal({
                   heatmap={heatmapData?.buckets}
                   visible={showPlayerControls}
                   onSeek={seekTo}
+                  onJumpToBest={jumpToBestPart}
                   besidePanel={queueBeside}
                 />
               </>

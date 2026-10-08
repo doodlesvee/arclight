@@ -4,10 +4,12 @@ import {
   Database,
   Eye,
   EyeOff,
+  Lock,
   FileEdit,
   FilePlus2,
   FolderSync,
   Shield,
+  Swords,
   Tag,
   Trash2,
   User,
@@ -34,6 +36,8 @@ const TYPE_CONFIG: Record<
   tag: { icon: Tag, label: "Tags", color: "text-purple-400" },
   performer: { icon: User, label: "Performers", color: "text-pink-400" },
   hide: { icon: EyeOff, label: "Hidden", color: "text-zinc-400" },
+  duel: { icon: Swords, label: "Duels", color: "text-yellow-400" },
+  vault: { icon: Lock, label: "Vault", color: "text-rose-400" },
   scan: { icon: FolderSync, label: "Scans", color: "text-cyan-400" },
   backup: { icon: Archive, label: "Backups", color: "text-orange-400" },
   library: { icon: Database, label: "Library", color: "text-teal-400" },
@@ -62,13 +66,6 @@ async function fetchActivity(
   if (!response.ok)
     throw new Error(`Activity request failed: ${response.status}`);
   return response.json();
-}
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
 }
 
 function dayKey(dateStr: string): string {

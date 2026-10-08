@@ -10,6 +10,7 @@ import { formatBytes } from "@/lib/statsApi";
 import { cn, formatDuration } from "@/lib/utils";
 import { DonutChart } from "./DonutChart";
 import { SettingsSection } from "./SettingsSection";
+import { StorageTreemap } from "./StorageTreemap";
 
 type Representative = { id: number; thumbnailFile: string | null } | null;
 
@@ -142,6 +143,13 @@ export function StorageInsightsSection() {
   return (
     <>
       <Overview data={data} appDataBytes={cache ? cache.derivedBytes + cache.uploadBytes : null} />
+
+      <SettingsSection
+        title="Space map"
+        description="Every block is a folder, sized by what it takes on disk. Click one to look inside."
+      >
+        <StorageTreemap />
+      </SettingsSection>
 
       <SettingsSection title="Studios" description="Share of the library by studio. Pick one to open it.">
         <DonutChart

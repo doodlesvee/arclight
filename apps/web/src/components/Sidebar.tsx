@@ -8,6 +8,7 @@ import {
   FolderOpen,
   Home,
   Inbox,
+  Swords,
   Lock,
   Images,
   Layers,
@@ -342,6 +343,24 @@ export function Sidebar({
           {!collapsed && "Series"}
         </Link>
         <InboxLink collapsed={collapsed} navItemClass={navItemClass} />
+        <Link
+          to="/duels"
+          className={navItemClass}
+          title={collapsed ? "Duels" : undefined}
+          activeProps={{ className: "bg-accent text-foreground font-medium" }}
+        >
+          <Swords className="size-4 shrink-0" />
+          {!collapsed && "Duels"}
+        </Link>
+        <Link
+          to="/vault"
+          className={navItemClass}
+          title={collapsed ? "Vault" : undefined}
+          activeProps={{ className: "bg-accent text-foreground font-medium" }}
+        >
+          <Lock className="size-4 shrink-0" />
+          {!collapsed && "Vault"}
+        </Link>
 
 
         {/* Collections and tags are text-only — collapsed they'd be a column of

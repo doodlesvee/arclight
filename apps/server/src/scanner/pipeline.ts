@@ -807,18 +807,34 @@ async function ensureArtworkForItem(
     .from(mediaItems)
     .where(eq(mediaItems.id, mediaItemId));
   if (!item) return;
-  await ensurePosterFrame(
-    filePath,
-    mediaItemId,
-    contentHash,
-    item.durationSeconds,
-  );
-  await ensurePreviewClip(
-    filePath,
-    mediaItemId,
-    contentHash,
-    item.durationSeconds,
-  );
+
+  // A video scanned while ffprobe was missing was stored with no duration and
+  // never probed again. Fill it in once the tool is available, so installing
+  // ffmpeg is enough to repair those items on the next scan.
+  let durationSeconds = item.durationSeconds;
+  if (durationSeconds === null) {
+    const probe = await probeVideo(filePath);
+    if (probe.durationSeconds !== null) {
+      durationSeconds = probe.durationSeconds;
+      await db
+        .update(mediaItems)
+        .set({
+          durationSeconds,
+          extraMetadata: {
+            ...((item.extraMetadata as Record<string, unknown> | null) ?? {}),
+            width: probe.width,
+            height: probe.height,
+            codec: probe.codec,
+            containerFormat: probe.containerFormat,
+            embeddedTitle: probe.embeddedTitle,
+          },
+        })
+        .where(eq(mediaItems.id, mediaItemId));
+    }
+  }
+
+  await ensurePosterFrame(filePath, mediaItemId, contentHash, durationSeconds);
+  await ensurePreviewClip(filePath, mediaItemId, contentHash, durationSeconds);
 }
 
 /**

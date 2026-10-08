@@ -2,7 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { resetDatabase, signIn, testApp } from "../test/harness.js";
 import { eq } from "drizzle-orm";
-import { SORTS } from "./mediaItems.js";
+import { SORTS } from "./mediaItemQueries.js";
 import { db } from "../db/client.js";
 import { performers } from "../db/schema.js";
 import {
