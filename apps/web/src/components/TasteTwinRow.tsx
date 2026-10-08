@@ -37,14 +37,16 @@ export function TasteTwinRow() {
       loading={isLoading}
     >
       {twins.map((twin) => {
+        // Only performers with an uploaded photo are shown one; the rest get
+        // their initial, as before.
         const portrait = twin.hasImage
-          ? performerPortraitUrl(twin as Parameters<typeof performerPortraitUrl>[0])
+          ? performerPortraitUrl({ ...twin, hasBanner: false, representativeItemId: null })
           : null;
         return (
           <button
             key={twin.id}
             type="button"
-            onClick={() => void navigate({ to: "/performer/$id", params: { id: String(twin.id) } })}
+            onClick={() => void navigate({ to: "/performer/$performerId", params: { performerId: String(twin.id) } })}
             className="group flex w-28 shrink-0 flex-col items-center gap-2"
           >
             <div className="relative size-20 overflow-hidden rounded-full bg-white/[0.06] ring-1 ring-white/10 transition-transform group-hover:scale-105">
@@ -53,7 +55,7 @@ export function TasteTwinRow() {
                   src={portrait}
                   alt=""
                   className="size-full object-cover"
-                  style={portraitStyle(twin as Parameters<typeof portraitStyle>[0])}
+                  style={portraitStyle(twin)}
                 />
               ) : (
                 <div className="flex size-full items-center justify-center text-lg font-bold text-muted-foreground">

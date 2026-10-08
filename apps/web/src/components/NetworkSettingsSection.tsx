@@ -159,10 +159,9 @@ export function NetworkSettingsSection() {
                   <code className="text-foreground/80">ipconfig getifaddr en0</code>
                   {network?.containerised ? (
                     <>
-                      , or start the server with{" "}
-                      <code className="text-foreground/80">npm run dev:docker</code> (or{" "}
-                      <code className="text-foreground/80">start:docker</code>), which looks it up and
-                      shows it here. Port <code className="text-foreground/80">{network.port}</code>.
+                      , or start the containers with{" "}
+                      <code className="text-foreground/80">sh docker/with-lan-host.sh docker compose up -d</code>
+                      , which looks it up and shows it here. Port <code className="text-foreground/80">{network.port}</code>.
                     </>
                   ) : (
                     "."

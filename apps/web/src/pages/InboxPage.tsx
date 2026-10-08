@@ -10,7 +10,7 @@ import { PerformerEditor } from "@/components/PerformerEditor";
 import { TagEditor } from "@/components/TagEditor";
 import { StarRating } from "@/components/StarRating";
 import { thumbnailUrl, framingStyle } from "@/lib/mediaItemApi";
-import { formatDuration, cn } from "@/lib/utils";
+import { formatDuration } from "@/lib/utils";
 
 type InboxPerformer = { id: number; name: string };
 type InboxTag = { id: number; name: string };
@@ -215,14 +215,10 @@ export function InboxPage() {
                 {item.thumbnailFile ? (
                   <img
                     key={item.id}
-                    src={thumbnailUrl(item.id, item.thumbnailFile)}
+                    src={thumbnailUrl(item)}
                     alt={item.title}
                     className="size-full object-cover"
-                    style={framingStyle(
-                      item.thumbnailPositionX,
-                      item.thumbnailPositionY,
-                      item.thumbnailScale,
-                    )}
+                    style={framingStyle(item)}
                   />
                 ) : (
                   <div className="flex size-full items-center justify-center text-muted-foreground">

@@ -3,7 +3,7 @@
 #
 # A container can only see its own address on the Docker bridge, so the
 # Settings screen cannot find the address a phone should open by itself. The
-# host can, so the npm scripts look it up here on every start — which also
+# host can, so this wrapper looks it up on every start — which also
 # means a new address after changing networks is picked up by just starting
 # again. An explicit LAN_HOST (in the shell or docker/.env) always wins.
 #

@@ -6,7 +6,7 @@ WORKDIR /repo
 # ffprobe/ffmpeg (scan-time metadata + poster frames) must exist in *every*
 # stage that can run the server — including `deps`, which is what the dev
 # compose override runs from. Installing it only in the runtime stage meant
-# posters and video metadata silently no-op'd under `npm run dev:docker`.
+# posters and video metadata silently no-op'd in dev mode.
 #
 # pg_dump backs up the database. It comes from the PGDG repo rather than
 # Debian's own, because bookworm ships postgresql-client-15 and pg_dump

@@ -35,13 +35,17 @@ services:
       # This machine's address on the wifi, for the local-network switch in
       # Settings to show. A container can only see its own address on the
       # Docker bridge, which is no use to a phone, so it has to be told —
-      # docker/with-lan-host.sh does that when started via `npm run dev:docker`.
+      # docker/with-lan-host.sh does that when it is run in front of docker compose.
       LAN_HOST: ${LAN_HOST:-}
       # The port a phone actually opens: Vite in dev, not the API.
       LAN_PORT: "5173"
     volumes:
       - ..:/repo
       - node_modules:/repo/node_modules
+
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
 
   web:
     build:

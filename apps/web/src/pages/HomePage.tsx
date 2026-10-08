@@ -169,7 +169,7 @@ export function HomePage() {
         dailyPickSeed != null ? `/api/daily-pick?seed=${dailyPickSeed}` : "/api/daily-pick",
       ),
   });
-  const { data: onThisDay, isLoading: onThisDayLoading } = useQuery({
+  const { data: onThisDay } = useQuery({
     queryKey: ["on-this-day"],
     queryFn: () => fetchJson<{ items: MediaCardItem[] }>("/api/on-this-day"),
   });

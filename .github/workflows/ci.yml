@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch makes an older run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Web — type-check, build, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # `tsc -b && vite build`: the same command the Docker image runs, so a
+      # type error that would break `make up` fails here first.
+      - run: npm run build --workspace apps/web
+      - run: npm test --workspace apps/web
+
+  server:
+    name: Server — type-check, test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: media
+          POSTGRES_PASSWORD: media
+          POSTGRES_DB: media
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U media"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # The video tests need ffmpeg, and the backup tests need a pg_dump new
+      # enough for a Postgres 17 server — the runner's own is older.
+      - name: Install ffmpeg and the Postgres 17 client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
+      - run: npm ci
+      - run: npx tsc --noEmit -p apps/server/tsconfig.json
+      # Some tests clear and rewrite folders under APP_DATA_DIR, so it points
+      # at a throwaway directory.
+      - name: Test
+        run: |
+          APP_DATA_DIR="$(mktemp -d)"
+          export APP_DATA_DIR
+          npm test --workspace apps/server
+
+  docker:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f docker/docker-compose.yml build

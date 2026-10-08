@@ -4,7 +4,7 @@ services:
       context: ..
       dockerfile: apps/server/Dockerfile
     ports:
-      - "3000:3000"
+      - "${APP_PORT:-3000}:3000"
     environment:
       DATABASE_URL: postgres://media:media@postgres:5432/media
       PORT: "3000"
@@ -16,7 +16,7 @@ services:
       WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN:-http://localhost:5173,http://localhost:3000}
       # This machine's address on the wifi, for Settings → Privacy to show a
       # phone. Filled in by docker/with-lan-host.sh when started through
-      # `npm run start:docker` / `dev:docker`.
+      # `sh docker/with-lan-host.sh docker compose up -d`.
       LAN_HOST: ${LAN_HOST:-}
     volumes:
       # Kept for compatibility with an existing library: paths already in the
@@ -25,7 +25,7 @@ services:
       # Browsable roots, read-only. Without these the container simply cannot
       # see the host filesystem, so the folder picker would have nothing to
       # offer beyond the single mount above.
-      - ${HOME_ROOT:-/Users}:/host/home:ro
+      - ${HOME_ROOT:-${HOME:-/Users}}:/host/home:ro
       - /Volumes:/host/volumes:ro
       # The one writable bind mount. Point BACKUP_DIR at an external drive or
       # a synced folder to survive disk failure, not just a wiped volume.
@@ -38,8 +38,10 @@ services:
 
   postgres:
     image: postgres:17-alpine
-    ports:
-      - "5432:5432"
+    # Deliberately not published to the host: the app reaches it over the
+    # compose network, and a fixed host port 5432 collides with any Postgres
+    # already running on the machine. docker-compose.dev.yml publishes it for
+    # development.
     environment:
       POSTGRES_USER: media
       POSTGRES_PASSWORD: media
