@@ -288,6 +288,20 @@
       "when": 1791216000000,
       "tag": "0040_hidden_items",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1791388800000,
+      "tag": "0041_heatmap_and_inbox",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1791475200000,
+      "tag": "0042_activity_log_expansion",
+      "breakpoints": true
     }
   ]
 }

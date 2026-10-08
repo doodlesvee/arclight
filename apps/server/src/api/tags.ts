@@ -2,6 +2,7 @@ import { eq, inArray } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { db } from "../db/client.js";
 import { mediaItemTags, mediaItems, tags } from "../db/schema.js";
+import { logActivity } from "../activity/log.js";
 
 export async function tagRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/tags", async () => {
@@ -43,6 +44,14 @@ export async function tagRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const assigned = tagIds.length > 0 ? await db.select().from(tags).where(inArray(tags.id, tagIds)) : [];
+
+      await logActivity(
+        "tag",
+        `Tags on "${item.title}" set to ${tagNames.length > 0 ? tagNames.join(", ") : "(none)"}`,
+        { tagNames },
+        itemId,
+      );
+
       return { tags: assigned };
     }
   );

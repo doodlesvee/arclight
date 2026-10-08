@@ -10,6 +10,7 @@ import {
   studios,
 } from "../db/schema.js";
 import { affinityEdges } from "../library/affinity.js";
+import { logActivity } from "../activity/log.js";
 
 // The co-performer query joins media_item_performers and performers to
 // themselves — once for the performer whose page this is, once for everyone
@@ -644,6 +645,14 @@ export async function performerRoutes(app: FastifyInstance): Promise<void> {
               .from(performers)
               .where(inArray(performers.id, performerIds))
           : [];
+
+      await logActivity(
+        "performer",
+        `Performers on "${item.title}" set to ${names.length > 0 ? names.join(", ") : "(none)"}`,
+        { performerNames: names },
+        itemId,
+      );
+
       return { performers: assigned };
     }
   );

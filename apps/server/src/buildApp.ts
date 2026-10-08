@@ -31,6 +31,7 @@ import { authRoutes } from "./api/auth.js";
 import { bookmarkRoutes } from "./api/bookmarks.js";
 import { storageRoutes } from "./api/storage.js";
 import { castRoutes } from "./api/cast.js";
+import { inboxRoutes } from "./api/inbox.js";
 import { insightsRoutes } from "./api/insights.js";
 import { achievementRoutes } from "./api/achievements.js";
 import { registerAuthGuard } from "./auth/guard.js";
@@ -132,6 +133,7 @@ export async function buildApp({
   await app.register(bookmarkRoutes);
   await app.register(storageRoutes);
   await app.register(castRoutes);
+  await app.register(inboxRoutes);
   await app.register(insightsRoutes);
   await app.register(achievementRoutes);
 

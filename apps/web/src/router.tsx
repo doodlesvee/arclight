@@ -10,6 +10,7 @@ import { AlbumsPage } from "@/pages/AlbumsPage";
 import { BrowsePage } from "@/pages/BrowsePage";
 import { HelpPage } from "@/pages/HelpPage";
 import { HomePage } from "@/pages/HomePage";
+import { InboxPage } from "@/pages/InboxPage";
 import { MissingPage } from "@/pages/MissingPage";
 import { PerformerPage } from "@/pages/PerformerPage";
 import { PerformersPage } from "@/pages/PerformersPage";
@@ -178,6 +179,12 @@ const studioRoute = createRoute({
   component: StudioPage,
 });
 
+const inboxRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/inbox",
+  component: InboxPage,
+});
+
 const missingRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/missing",
@@ -220,6 +227,7 @@ const routeTree = rootRoute.addChildren([
   albumRoute,
   studiosRoute,
   studioRoute,
+  inboxRoute,
   missingRoute,
   helpRoute,
   settingsRoute,

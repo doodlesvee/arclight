@@ -1,7 +1,10 @@
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { db } from "../db/client.js";
-import { playbackStates, watchLog } from "../db/schema.js";
+import { mediaItems, playbackHeatmap, playbackStates, watchLog } from "../db/schema.js";
+import { logActivity } from "../activity/log.js";
+
+const HEATMAP_BUCKETS = 50;
 
 /**
  * How much of a progress report counts as watching.
@@ -55,8 +58,6 @@ export async function playbackRoutes(app: FastifyInstance): Promise<void> {
           set: { positionSeconds, updatedAt: now },
         });
 
-      // The watch log is a bonus on top of saving your place: if it fails,
-      // the position above is already saved and the request still succeeds.
       const watched = secondsWatched(previous, positionSeconds, now);
       if (watched > 0) {
         const hour = new Date(now);
@@ -72,10 +73,52 @@ export async function playbackRoutes(app: FastifyInstance): Promise<void> {
         } catch (error) {
           request.log.warn({ error }, "watch log: could not record");
         }
+
+        try {
+          const [item] = await db
+            .select({ durationSeconds: mediaItems.durationSeconds })
+            .from(mediaItems)
+            .where(eq(mediaItems.id, mediaItemId));
+          if (item?.durationSeconds && item.durationSeconds > 0) {
+            const bucket = Math.min(
+              HEATMAP_BUCKETS - 1,
+              Math.floor((positionSeconds / item.durationSeconds) * HEATMAP_BUCKETS),
+            );
+            await db
+              .insert(playbackHeatmap)
+              .values({ mediaItemId, bucket })
+              .onConflictDoUpdate({
+                target: [playbackHeatmap.mediaItemId, playbackHeatmap.bucket],
+                set: { count: sql`${playbackHeatmap.count} + 1` },
+              });
+          }
+        } catch (error) {
+          request.log.warn({ error }, "heatmap: could not record");
+        }
       }
 
       return { ok: true };
     }
+  );
+
+  app.get<{ Params: { id: string } }>(
+    "/api/media-items/:id/heatmap",
+    async (request) => {
+      const mediaItemId = Number(request.params.id);
+      const rows = await db
+        .select({ bucket: playbackHeatmap.bucket, count: playbackHeatmap.count })
+        .from(playbackHeatmap)
+        .where(eq(playbackHeatmap.mediaItemId, mediaItemId))
+        .orderBy(playbackHeatmap.bucket);
+
+      const buckets = new Array(HEATMAP_BUCKETS).fill(0);
+      for (const row of rows) {
+        if (row.bucket >= 0 && row.bucket < HEATMAP_BUCKETS) {
+          buckets[row.bucket] = row.count;
+        }
+      }
+      return { buckets };
+    },
   );
 
   /**
@@ -147,6 +190,17 @@ export async function playbackRoutes(app: FastifyInstance): Promise<void> {
           },
         })
         .returning({ playCount: playbackStates.playCount });
+
+      const [item] = await db
+        .select({ title: mediaItems.title })
+        .from(mediaItems)
+        .where(eq(mediaItems.id, mediaItemId));
+      await logActivity(
+        "watch",
+        `Watched "${item?.title ?? `#${mediaItemId}`}"`,
+        { playCount: row?.playCount ?? 1 },
+        mediaItemId,
+      );
 
       return { ok: true, watched: true, playCount: row?.playCount ?? 1 };
     }

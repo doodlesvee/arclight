@@ -12,7 +12,11 @@ import { clearScopeForRoot, purgeEmptyEntities, recomputeScope } from "../librar
 // A container can only see what's mounted into it, so these are the mount
 // points the picker is allowed to walk. Anything outside them isn't a
 // permissions decision — the path genuinely doesn't exist in here.
-const BROWSE_ROOTS = (process.env.BROWSE_ROOTS ?? process.env.MEDIA_ROOT ?? "/media")
+const BROWSE_ROOTS = (
+  process.env.BROWSE_ROOTS ??
+  process.env.MEDIA_ROOT ??
+  ["/media", process.env.HOME].filter(Boolean).join(",")
+)
   .split(",")
   .map((p) => path.resolve(p.trim()))
   .filter(Boolean);
@@ -165,10 +169,9 @@ export async function libraryRoutes(app: FastifyInstance): Promise<void> {
       return { error: `That overlaps a folder already scanned (${overlap.path})` };
     }
 
-    const [library] = await db.select().from(libraries).orderBy(libraries.id).limit(1);
+    let [library] = await db.select().from(libraries).orderBy(libraries.id).limit(1);
     if (!library) {
-      reply.code(500);
-      return { error: "No library exists" };
+      [library] = await db.insert(libraries).values({ name: "Library" }).returning();
     }
 
     const [created] = await db

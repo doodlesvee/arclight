@@ -7,6 +7,7 @@ import {
   Clapperboard,
   FolderOpen,
   Home,
+  Inbox,
   Lock,
   Images,
   Layers,
@@ -64,6 +65,45 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <div className="px-3 pb-1.5 pt-5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
       {children}
     </div>
+  );
+}
+
+function InboxLink({
+  collapsed,
+  navItemClass,
+}: {
+  collapsed: boolean;
+  navItemClass: string;
+}) {
+  const { data } = useQuery({
+    queryKey: ["inbox-count"],
+    queryFn: async () => {
+      const res = await fetch("/api/inbox/count");
+      if (!res.ok) return { count: 0 };
+      return res.json() as Promise<{ count: number }>;
+    },
+    refetchInterval: 60_000,
+  });
+  const count = data?.count ?? 0;
+
+  return (
+    <Link
+      to="/inbox"
+      className={navItemClass}
+      title={collapsed ? "Inbox" : undefined}
+      activeProps={{ className: "bg-accent text-foreground font-medium" }}
+    >
+      <Inbox className="size-4 shrink-0" />
+      {!collapsed && "Inbox"}
+      {count > 0 && (
+        <span className={cn(
+          "ml-auto rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-foreground",
+          collapsed && "absolute right-1 top-0.5",
+        )}>
+          {count > 99 ? "99+" : count}
+        </span>
+      )}
+    </Link>
   );
 }
 
@@ -301,6 +341,7 @@ export function Sidebar({
           <Tv className="size-4 shrink-0" />
           {!collapsed && "Series"}
         </Link>
+        <InboxLink collapsed={collapsed} navItemClass={navItemClass} />
 
 
         {/* Collections and tags are text-only — collapsed they'd be a column of

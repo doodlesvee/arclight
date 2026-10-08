@@ -31,6 +31,7 @@ export function SeekStrip({
   currentTime,
   sprite,
   bookmarks,
+  heatmap,
   visible,
   onSeek,
   besidePanel = false,
@@ -39,6 +40,7 @@ export function SeekStrip({
   currentTime: number;
   sprite: ScrubSprite | undefined;
   bookmarks: Bookmark[];
+  heatmap?: number[];
   visible: boolean;
   onSeek: (seconds: number) => void;
   /** The queue is open over the right of the frame; stop short of it. */
@@ -47,6 +49,8 @@ export function SeekStrip({
   const trackRef = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<{ x: number; width: number; seconds: number } | null>(null);
   const [dragging, setDragging] = useState(false);
+
+  const heatmapMax = heatmap ? Math.max(...heatmap) : 0;
 
   if (!(duration > 0)) return null;
 
@@ -158,6 +162,17 @@ export function SeekStrip({
         // padding is what a thumb can actually land on.
         className="group relative flex h-5 cursor-pointer touch-none items-center"
       >
+        {heatmapMax > 1 && heatmap && (
+          <div className="absolute inset-x-0 bottom-full mb-0.5 flex h-6 items-end gap-px opacity-0 transition-opacity group-hover:opacity-100">
+            {heatmap.map((count, i) => (
+              <div
+                key={i}
+                className="flex-1 rounded-t-sm bg-white/30"
+                style={{ height: count > 0 ? `${Math.max(8, (count / heatmapMax) * 100)}%` : "0%" }}
+              />
+            ))}
+          </div>
+        )}
         <div className="relative h-1 w-full rounded-full bg-white/25 transition-[height] group-hover:h-1.5">
           <div
             className="absolute inset-y-0 left-0 rounded-full bg-white/80"

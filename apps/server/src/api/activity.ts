@@ -4,10 +4,13 @@ import { activityEvents } from "../db/schema.js";
 import { listActivity } from "../activity/log.js";
 
 export async function activityRoutes(app: FastifyInstance): Promise<void> {
-  app.get<{ Querystring: { limit?: string } }>(
+  app.get<{ Querystring: { limit?: string; type?: string } }>(
     "/api/activity",
     async (request) => ({
-      events: await listActivity(Number(request.query.limit ?? 100)),
+      events: await listActivity(
+        Number(request.query.limit ?? 200),
+        request.query.type || undefined,
+      ),
     }),
   );
 

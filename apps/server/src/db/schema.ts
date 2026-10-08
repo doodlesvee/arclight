@@ -122,6 +122,7 @@ export const mediaItems = pgTable("media_items", {
   episodeNumber: integer("episode_number"),
   episodeTitle: text("episode_title"),
   hiddenAt: timestamp("hidden_at"),
+  triagedAt: timestamp("triaged_at"),
   durationSeconds: integer("duration_seconds"),
   takenAt: timestamp("taken_at"),
   extraMetadata: jsonb("extra_metadata"),
@@ -390,6 +391,7 @@ export const activityEvents = pgTable("activity_events", {
   type: text("type").notNull(),
   message: text("message").notNull(),
   metadata: jsonb("metadata"),
+  mediaItemId: integer("media_item_id").references(() => mediaItems.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -470,6 +472,24 @@ export const watchLog = pgTable(
   (table) => [
     uniqueIndex("watch_log_item_hour_idx").on(table.mediaItemId, table.hour),
     index("watch_log_hour_idx").on(table.hour),
+  ],
+);
+
+export const playbackHeatmap = pgTable(
+  "playback_heatmap",
+  {
+    id: serial("id").primaryKey(),
+    mediaItemId: integer("media_item_id")
+      .notNull()
+      .references(() => mediaItems.id),
+    bucket: integer("bucket").notNull(),
+    count: integer("count").notNull().default(1),
+  },
+  (table) => [
+    uniqueIndex("playback_heatmap_item_bucket_idx").on(
+      table.mediaItemId,
+      table.bucket,
+    ),
   ],
 );
 

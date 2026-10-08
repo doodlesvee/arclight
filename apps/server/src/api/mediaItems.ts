@@ -31,6 +31,7 @@ import {
   watchLog,
 } from "../db/schema.js";
 import { playbackWarningFor } from "../media/compatibility.js";
+import { logActivity } from "../activity/log.js";
 import { getHeroSettings, getKindCovers, setKindCover } from "./settings.js";
 import { deleteKindCover, kindCoverPath, saveKindCover } from "../media/kindCovers.js";
 import { streamFile } from "../media/streamer.js";
@@ -1756,6 +1757,23 @@ export async function mediaItemRoutes(app: FastifyInstance): Promise<void> {
       reply.code(404);
       return { error: "Not found" };
     }
+
+    const changes: string[] = [];
+    if (title !== undefined) changes.push(`title → "${title}"`);
+    if (rating !== undefined) changes.push(rating ? `rated ${rating}★` : "rating cleared");
+    if (isFavorite !== undefined) changes.push(isFavorite ? "favorited" : "unfavorited");
+    if (studio !== undefined) changes.push(studio ? `studio → "${studio}"` : "studio cleared");
+    if (description !== undefined) changes.push("description updated");
+    if (changes.length > 0) {
+      const itemTitle = updated[0].title;
+      await logActivity(
+        "edit",
+        `Edited "${itemTitle}": ${changes.join(", ")}`,
+        { fields: changes },
+        id,
+      );
+    }
+
     return { ok: true };
   });
 
@@ -1774,12 +1792,20 @@ export async function mediaItemRoutes(app: FastifyInstance): Promise<void> {
         .update(mediaItems)
         .set({ hiddenAt: hidden ? new Date() : null })
         .where(eq(mediaItems.id, id))
-        .returning({ id: mediaItems.id });
+        .returning({ id: mediaItems.id, title: mediaItems.title });
 
       if (updated.length === 0) {
         reply.code(404);
         return { error: "Not found" };
       }
+
+      await logActivity(
+        "hide",
+        hidden ? `Hidden "${updated[0].title}"` : `Unhidden "${updated[0].title}"`,
+        { hidden },
+        id,
+      );
+
       return { ok: true, hidden };
     }
   );

@@ -5,6 +5,7 @@ import {
   ChevronRight,
   CornerLeftUp,
   Folder,
+  Home,
   Loader2,
   Plus,
   Trash2,
@@ -167,15 +168,34 @@ export function LibrarySettingsSection() {
 
       {browsing ? (
         <div className="space-y-2 rounded-md border border-border p-3">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="min-w-0 flex-1 truncate font-mono">
-              {listing?.path ?? "Choose a location"}
-            </span>
-            {listing?.parent && (
+          <div className="flex items-center gap-2 text-xs">
+            <button
+              type="button"
+              onClick={() => setDir(undefined)}
+              className={`flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors ${
+                dir === undefined
+                  ? "font-semibold text-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              }`}
+            >
+              <Home className="size-3" />
+              Locations
+            </button>
+            {listing?.path && (
+              <>
+                <ChevronRight className="size-3 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 truncate font-mono text-muted-foreground">
+                  {listing.path}
+                </span>
+              </>
+            )}
+            {(listing?.parent || (listing?.path && !listing?.parent)) && (
               <button
                 type="button"
-                onClick={() => setDir(listing.parent ?? undefined)}
-                className="flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-accent hover:text-foreground"
+                onClick={() =>
+                  listing?.parent ? setDir(listing.parent) : setDir(undefined)
+                }
+                className="ml-auto flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
                 <CornerLeftUp className="size-3" />
                 Up
@@ -207,25 +227,32 @@ export function LibrarySettingsSection() {
                 </li>
               ))}
             </ul>
-          ) : (
+          ) : listing?.path ? (
             <p className="text-xs text-muted-foreground">No subfolders here.</p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Pick a location to browse.
+            </p>
           )}
 
           {error && <p className="text-xs text-destructive">{error}</p>}
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => listing?.path && add.mutate(listing.path)}
-              disabled={!listing?.path || add.isPending}
-              className="rounded-md bg-white px-3 py-1.5 text-xs font-semibold text-black disabled:opacity-50"
-            >
-              Add this folder
-            </button>
+            {listing?.path && (
+              <button
+                type="button"
+                onClick={() => add.mutate(listing.path!)}
+                disabled={add.isPending}
+                className="rounded-md bg-white px-3 py-1.5 text-xs font-semibold text-black disabled:opacity-50"
+              >
+                Add this folder
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {
                 setBrowsing(false);
+                setDir(undefined);
                 setError(null);
               }}
               className="rounded-md px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"

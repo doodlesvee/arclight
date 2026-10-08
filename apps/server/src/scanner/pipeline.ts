@@ -370,6 +370,8 @@ async function processFile(
     await ensurePreviewClip(filePath, item.id, contentHash, durationSeconds);
   }
 
+  await logActivity("add", `Added "${title}"`, { kind }, item.id);
+
   return "new";
 }
 

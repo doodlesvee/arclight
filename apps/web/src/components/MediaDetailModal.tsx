@@ -231,6 +231,16 @@ export function MediaDetailModal({
     viewingId,
     isVideo && mode === "playing" && !mini,
   );
+  const { data: heatmapData } = useQuery({
+    queryKey: ["heatmap", viewingId],
+    queryFn: async () => {
+      const res = await fetch(`/api/media-items/${viewingId}/heatmap`);
+      if (!res.ok) return { buckets: [] as number[] };
+      return res.json() as Promise<{ buckets: number[] }>;
+    },
+    enabled: isVideo && mode === "playing",
+    staleTime: 60_000,
+  });
   const [miniPosition, setMiniPosition] = useState(() => {
     const width = 384;
     return {
@@ -1102,6 +1112,7 @@ export function MediaDetailModal({
                   currentTime={currentTime}
                   sprite={scrubSprite}
                   bookmarks={bookmarks}
+                  heatmap={heatmapData?.buckets}
                   visible={showPlayerControls}
                   onSeek={seekTo}
                   besidePanel={queueBeside}
