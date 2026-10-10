@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clapperboard, Fingerprint, Loader2, WifiOff } from "lucide-react";
 import { LanBlockedError, fetchAuthStatus, login, setupAccount } from "@/lib/authApi";
 import { loginWithPasskey } from "@/lib/webauthnApi";
+import { AppOpenGate, clearAppOpenUnlock } from "./AppOpenGate";
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -24,6 +25,10 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     retry: (count, cause) => !(cause instanceof LanBlockedError) && count < 3,
   });
 
+  useEffect(() => {
+    if (status && !status.user) clearAppOpenUnlock();
+  }, [status]);
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -37,12 +42,15 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   // that refuses every attempt for reasons it never explains.
   if (error instanceof LanBlockedError) return <LanBlocked />;
 
-  if (status?.user) return <>{children}</>;
+  if (status?.user) return <AppOpenGate>{children}</AppOpenGate>;
 
   return (
     <AuthForm
       mode={status?.needsSetup ? "setup" : "login"}
-      onSuccess={() => queryClient.invalidateQueries({ queryKey: ["auth-status"] })}
+      onSuccess={() => {
+        clearAppOpenUnlock();
+        return queryClient.invalidateQueries({ queryKey: ["auth-status"] });
+      }}
     />
   );
 }
@@ -106,7 +114,7 @@ function AuthForm({ mode, onSuccess }: { mode: "setup" | "login"; onSuccess: () 
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-5">
         <div className="flex items-center gap-2">
           <Clapperboard className="size-6" />
-          <span className="text-xl font-bold tracking-tight">ArcLight</span>
+          <span className="text-xl font-bold tracking-tight">Arc Light</span>
         </div>
 
         <div className="space-y-1">

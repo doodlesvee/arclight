@@ -5,6 +5,7 @@ export type Bookmark = {
   mediaItemId: number;
   positionSeconds: number;
   label: string | null;
+  note: string | null;
   createdAt: string;
 };
 
@@ -71,12 +72,16 @@ export function useBookmarkMutations(itemId: number) {
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["bookmarks", itemId] });
 
   const add = useMutation({
-    mutationFn: async ({ positionSeconds, label }: { positionSeconds: number; label?: string }) =>
+    mutationFn: async ({ positionSeconds, label, note }: {
+      positionSeconds: number;
+      label?: string;
+      note?: string;
+    }) =>
       json<Bookmark>(
         await fetch(`/api/media-items/${itemId}/bookmarks`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ positionSeconds, label }),
+          body: JSON.stringify({ positionSeconds, label, note }),
         }),
       ),
     onSuccess: refresh,
@@ -94,11 +99,23 @@ export function useBookmarkMutations(itemId: number) {
     onSuccess: refresh,
   });
 
+  const saveNote = useMutation({
+    mutationFn: async ({ id, note }: { id: number; note: string }) =>
+      json<Bookmark>(
+        await fetch(`/api/bookmarks/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ note }),
+        }),
+      ),
+    onSuccess: refresh,
+  });
+
   const remove = useMutation({
     mutationFn: async (id: number) =>
       json<{ ok: true }>(await fetch(`/api/bookmarks/${id}`, { method: "DELETE" })),
     onSuccess: refresh,
   });
 
-  return { add, rename, remove };
+  return { add, rename, saveNote, remove };
 }

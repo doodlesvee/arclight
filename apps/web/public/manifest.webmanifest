@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "ArcLight",
-  "short_name": "ArcLight",
+  "name": "Arc Light",
+  "short_name": "Arc Light",
   "description": "A private personal media library.",
   "start_url": "/",
   "scope": "/",

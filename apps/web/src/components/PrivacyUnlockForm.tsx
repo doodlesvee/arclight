@@ -17,7 +17,7 @@ export function PrivacyUnlockForm({
   autoFocus = true,
 }: {
   onUnlocked: () => void;
-  onCancel: () => void;
+  onCancel?: () => void;
   autoFocus?: boolean;
 }) {
   const [password, setPassword] = useState("");
@@ -141,13 +141,15 @@ export function PrivacyUnlockForm({
             Unlock
           </button>
         )}
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground"
-        >
-          Cancel
-        </button>
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+          >
+            Cancel
+          </button>
+        )}
       </div>
     </form>
   );

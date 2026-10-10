@@ -525,5 +525,6 @@ export const bookmarks = pgTable("bookmarks", {
     .references(() => mediaItems.id),
   positionSeconds: integer("position_seconds").notNull(),
   label: text("label"),
+  note: text("note"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

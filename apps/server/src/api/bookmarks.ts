@@ -4,10 +4,16 @@ import { db } from "../db/client.js";
 import { bookmarks, mediaItems } from "../db/schema.js";
 
 const MAX_LABEL_LENGTH = 200;
+const MAX_NOTE_LENGTH = 4000;
 
 /** Trims, and turns an empty label into no label rather than "". */
 function cleanLabel(label: string | null | undefined): string | null {
   const trimmed = label?.trim().slice(0, MAX_LABEL_LENGTH);
+  return trimmed ? trimmed : null;
+}
+
+function cleanNote(note: string | null | undefined): string | null {
+  const trimmed = note?.trim().slice(0, MAX_NOTE_LENGTH);
   return trimmed ? trimmed : null;
 }
 
@@ -16,6 +22,7 @@ const columns = {
   mediaItemId: bookmarks.mediaItemId,
   positionSeconds: bookmarks.positionSeconds,
   label: bookmarks.label,
+  note: bookmarks.note,
   createdAt: bookmarks.createdAt,
 };
 
@@ -39,14 +46,18 @@ export async function bookmarkRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{
     Params: { id: string };
-    Body: { positionSeconds: number; label?: string | null };
+    Body: { positionSeconds: number; label?: string | null; note?: string | null };
   }>("/api/media-items/:id/bookmarks", async (request, reply) => {
     const id = Number(request.params.id);
-    const { positionSeconds, label } = request.body ?? {};
+    const { positionSeconds, label, note } = request.body ?? {};
 
     if (typeof positionSeconds !== "number" || !Number.isFinite(positionSeconds) || positionSeconds < 0) {
       reply.code(400);
       return { error: "positionSeconds must be a number of seconds, 0 or more" };
+    }
+    if ((label != null && typeof label !== "string") || (note != null && typeof note !== "string")) {
+      reply.code(400);
+      return { error: "label and note must be strings" };
     }
 
     const [item] = await db
@@ -67,20 +78,49 @@ export async function bookmarkRoutes(app: FastifyInstance): Promise<void> {
 
     const [created] = await db
       .insert(bookmarks)
-      .values({ mediaItemId: id, positionSeconds: position, label: cleanLabel(label) })
+      .values({
+        mediaItemId: id,
+        positionSeconds: position,
+        label: cleanLabel(label),
+        note: cleanNote(note),
+      })
       .returning(columns);
 
     reply.code(201);
     return created;
   });
 
-  app.patch<{ Params: { id: string }; Body: { label?: string | null } }>(
+  app.patch<{
+    Params: { id: string };
+    Body: { label?: string | null; note?: string | null };
+  }>(
     "/api/bookmarks/:id",
     async (request, reply) => {
       const id = Number(request.params.id);
+      const body = request.body ?? {};
+      const update: { label?: string | null; note?: string | null } = {};
+      if ("label" in body) {
+        if (body.label != null && typeof body.label !== "string") {
+          reply.code(400);
+          return { error: "label must be a string" };
+        }
+        update.label = cleanLabel(body.label);
+      }
+      if ("note" in body) {
+        if (body.note != null && typeof body.note !== "string") {
+          reply.code(400);
+          return { error: "note must be a string" };
+        }
+        update.note = cleanNote(body.note);
+      }
+      if (Object.keys(update).length === 0) {
+        reply.code(400);
+        return { error: "Provide a label or note to update" };
+      }
+
       const [updated] = await db
         .update(bookmarks)
-        .set({ label: cleanLabel(request.body?.label) })
+        .set(update)
         .where(eq(bookmarks.id, id))
         .returning(columns);
       if (!updated) {

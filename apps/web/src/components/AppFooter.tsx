@@ -30,7 +30,7 @@ export function AppFooter() {
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="flex items-center gap-2 font-medium text-foreground/80">
             <Clapperboard className="size-3.5" />
-            ArcLight
+            Arc Light
           </span>
           {/* Two shortcuts have no button anywhere — this is how you'd find
               out they exist at all. Padded out to a usable tap target, and

@@ -14,6 +14,7 @@ import { categoryRoutes } from "./api/categories.js";
 import { collectionRoutes } from "./api/collections.js";
 import { folderRoutes } from "./api/folders.js";
 import { libraryRoutes } from "./api/library.js";
+import { libraryMapRoutes } from "./api/libraryMap.js";
 import { mediaItemRoutes } from "./api/mediaItems.js";
 import { kindRoutes } from "./api/kinds.js";
 import { discoveryRoutes } from "./api/discovery.js";
@@ -91,7 +92,7 @@ export async function buildApp({
   });
 
   await app.register(swagger, {
-    openapi: { info: { title: "ArcLight API", version: "0.0.1" } },
+    openapi: { info: { title: "Arc Light API", version: "0.0.1" } },
   });
   await app.register(swaggerUi, { routePrefix: "/api/docs" });
 
@@ -135,6 +136,7 @@ export async function buildApp({
   await app.register(seriesRoutes);
   await app.register(settingsRoutes);
   await app.register(libraryRoutes);
+  await app.register(libraryMapRoutes);
   await app.register(backupRoutes);
   await app.register(categoryRoutes);
   await app.register(albumRoutes);

@@ -23,6 +23,8 @@ function renderAccount() {
     needsSetup: false,
     user: { id: 1, username: "Tester" },
   });
+  client.setQueryData(["privacy"], { hasPassword: false });
+  client.setQueryData(["passkeys"], []);
   client.setQueryData(["media-items"], { items: [{ id: 1 }] });
   render(
     <QueryClientProvider client={client}>

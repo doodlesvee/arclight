@@ -181,7 +181,7 @@ export function AppShell({
               <Menu className="size-5" />
             </button>
             <span className="truncate text-sm font-semibold tracking-tight">
-              {title ?? "ArcLight"}
+              {title ?? "Arc Light"}
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-1.5 md:gap-3">

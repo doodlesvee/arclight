@@ -43,7 +43,7 @@ export function parseOrigins(value: string | undefined): { origins: string[]; rp
 }
 
 const { origins: ORIGINS, rpId: RP_ID } = parseOrigins(process.env.WEBAUTHN_ORIGIN);
-const RP_NAME = "ArcLight";
+const RP_NAME = "Arc Light";
 
 /**
  * Pending challenges, per session.

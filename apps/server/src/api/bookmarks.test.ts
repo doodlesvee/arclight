@@ -28,7 +28,7 @@ describe("bookmarks", () => {
 
     const late = await request("POST", `/api/media-items/${id}/bookmarks`, { positionSeconds: 400.7, label: "  Late  " });
     expect(late.statusCode).toBe(201);
-    expect(late.json()).toMatchObject({ positionSeconds: 400, label: "Late" });
+    expect(late.json()).toMatchObject({ positionSeconds: 400, label: "Late", note: null });
     await request("POST", `/api/media-items/${id}/bookmarks`, { positionSeconds: 30 });
 
     const list = (await request("GET", `/api/media-items/${id}/bookmarks`)).json();
@@ -48,6 +48,34 @@ describe("bookmarks", () => {
     const id = await makeItem(libraryId, { durationSeconds: 100 });
     const res = await request("POST", `/api/media-items/${id}/bookmarks`, { positionSeconds: 100.4 });
     expect(res.json().positionSeconds).toBe(100);
+  });
+
+  it("saves and clears a note without changing the bookmark label", async () => {
+    const id = await makeItem(libraryId);
+    const created = await request("POST", `/api/media-items/${id}/bookmarks`, {
+      positionSeconds: 52,
+      label: "Favorite shot",
+    });
+    const bookmarkId = created.json().id;
+
+    const annotated = await request("PATCH", `/api/bookmarks/${bookmarkId}`, {
+      note: "  Notice the detail in the background.  ",
+    });
+    expect(annotated.statusCode).toBe(200);
+    expect(annotated.json()).toMatchObject({
+      label: "Favorite shot",
+      note: "Notice the detail in the background.",
+    });
+
+    const cleared = await request("PATCH", `/api/bookmarks/${bookmarkId}`, { note: "  " });
+    expect(cleared.json()).toMatchObject({ label: "Favorite shot", note: null });
+  });
+
+  it("rejects a non-text annotation", async () => {
+    const id = await makeItem(libraryId);
+    const created = await request("POST", `/api/media-items/${id}/bookmarks`, { positionSeconds: 12 });
+    const result = await request("PATCH", `/api/bookmarks/${created.json().id}`, { note: 42 });
+    expect(result.statusCode).toBe(400);
   });
 
   it("rejects a bad position and an unknown item", async () => {

@@ -170,7 +170,7 @@ export function PerformerBanner({
         </>
       )}
 
-      <div className="absolute right-4 top-4 z-10 flex items-center gap-1.5">
+      <div className="absolute right-4 top-20 z-10 flex items-center gap-1.5">
         {!editing && (
           <button
             type="button"

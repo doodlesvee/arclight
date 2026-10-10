@@ -1,4 +1,4 @@
-# ArcLight
+# Arc Light
 
 A self-hosted media library for a personal video collection, built around one
 idea: **your filesystem is the source of truth, and no metadata ever comes from
@@ -37,8 +37,12 @@ the files themselves are opened read-only.
 - **Maps who works with whom** — Performers → Network draws a graph linking
   performers by the videos they share or the studios they have in common,
   with focus, hide and shortest-path tools
+- **Explores the library as a map** — performers, studios, tags, albums and
+  series connect wherever they share visible media; search to pull any entity
+  and its strongest links into view
 - **Previews the seek bar**: hover or drag along it to see the frame you're
-  about to jump to, and bookmark moments inside a video to come back to
+  about to jump to, bookmark moments inside a video, and attach private notes
+  to those timestamps
 - **Sorts** by date added, release date, title (A–Z or Z–A) and more, and
   remembers the choice per page
 - **Works on a phone** over your wifi — a drawer sidebar, swipeable hero and
@@ -231,7 +235,7 @@ matter if you're running the server directly on the host (`npm run dev
 --workspace apps/server`) rather than through Docker; the Docker path hardcodes
 its own values for these inside the compose file.
 
-### Using ArcLight in a browser
+### Using Arc Light in a browser
 
 Start Docker, then build and start the server:
 
@@ -239,7 +243,7 @@ Start Docker, then build and start the server:
 make up
 ```
 
-Open <http://localhost:3000> in your browser. ArcLight does not require a
+Open <http://localhost:3000> in your browser. Arc Light does not require a
 desktop launcher or an installed browser app. Use Chrome for Chromecast;
 Touch ID uses the browser's passkey support.
 Registered passkeys can also sign you in: choose **Sign in with passkey** on

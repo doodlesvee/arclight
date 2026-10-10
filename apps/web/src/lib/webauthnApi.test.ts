@@ -99,7 +99,7 @@ describe("registerPasskey", () => {
     }));
     vi.mocked(startRegistration).mockRejectedValue(error);
 
-    await expect(registerPasskey("ArcLight")).rejects.toMatchObject({
+    await expect(registerPasskey("Arc Light")).rejects.toMatchObject({
       message: "Touch ID setup failed (SecurityError): The relying party is not allowed.",
       cause: error,
     });
@@ -115,7 +115,7 @@ describe("registerPasskey", () => {
       new DOMException("Already registered", "InvalidStateError"),
     );
 
-    await expect(registerPasskey("ArcLight")).rejects.toThrow(
+    await expect(registerPasskey("Arc Light")).rejects.toThrow(
       "This browser is already set up — it's in the list above.",
     );
   });

@@ -5,7 +5,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { loginWithPasskey } from "@/lib/webauthnApi";
 import { AuthGate } from "./AuthGate";
 
-vi.mock("@/lib/webauthnApi", () => ({ loginWithPasskey: vi.fn() }));
+vi.mock("@/lib/webauthnApi", () => ({
+  fetchPasskeys: vi.fn(),
+  loginWithPasskey: vi.fn(),
+}));
 
 afterEach(() => {
   cleanup();
@@ -18,6 +21,8 @@ function renderGate(needsSetup = false) {
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
   client.setQueryData(["auth-status"], { needsSetup, user: null });
+  client.setQueryData(["privacy"], { hasPassword: false });
+  client.setQueryData(["passkeys"], []);
   render(
     <QueryClientProvider client={client}>
       <AuthGate><p>Private library</p></AuthGate>

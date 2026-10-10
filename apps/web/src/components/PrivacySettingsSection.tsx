@@ -60,7 +60,7 @@ export function PrivacySettingsSection() {
   return (
     <SettingsSection
       title="Privacy"
-      description={`Discreet mode blurs every image in the app. ${DISCREET_SHORTCUT} turns it on from any page. Set a password here and it can't be turned off again without one.`}
+      description={`Discreet mode blurs every image in the app. ${DISCREET_SHORTCUT} turns it on from any page. Once a privacy password or Touch ID is set, the app asks to unlock when opened in a new tab; reloads stay unlocked.`}
     >
       <div className="space-y-3">
         <p className="text-xs text-muted-foreground">
