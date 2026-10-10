@@ -33,6 +33,7 @@ export function TagEditor({
       queryClient.invalidateQueries({ queryKey: ["media-items"] });
       queryClient.invalidateQueries({ queryKey: ["tags"] });
       queryClient.invalidateQueries({ queryKey: ["collection-items"] });
+      queryClient.invalidateQueries({ queryKey: ["inbox"] });
     },
     // Tags are edited optimistically in `pending`, so a failed save otherwise
     // leaves the chips showing a state the server never accepted.

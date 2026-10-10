@@ -51,6 +51,7 @@ export function StarRating({
       queryClient.invalidateQueries({ queryKey: ["media-item", itemId] });
       // Rating sorts and filters live in the grid queries.
       queryClient.invalidateQueries({ queryKey: ["media-items"] });
+      queryClient.invalidateQueries({ queryKey: ["inbox"] });
     },
   });
 

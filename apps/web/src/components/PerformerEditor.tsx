@@ -52,6 +52,7 @@ export function PerformerEditor({
       queryClient.invalidateQueries({ queryKey: ["media-item", itemId] });
       queryClient.invalidateQueries({ queryKey: ["media-items"] });
       queryClient.invalidateQueries({ queryKey: ["performers"] });
+      queryClient.invalidateQueries({ queryKey: ["inbox"] });
     },
   });
 

@@ -35,15 +35,17 @@ async function scan(): Promise<void> {
  * 12-second run of this file plus the routes suite into a 16-minute one and
  * left the next suite failing in `beforeEach`.
  *
- * Inline base64 rather than a fixture on disk or a call to sharp: it is 125
+ * Inline base64 rather than a fixture on disk or a call to sharp: it is 267
  * bytes, it needs no I/O to produce, and a test that depends on the image
  * library to build its own input cannot fail cleanly when that library is
  * what is broken.
  */
 const TINY_JPEG = Buffer.from(
-  "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB" +
-    "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAALCAABAAEBAREA/8QAFAABAAAA" +
-    "AAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==",
+  "/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSop" +
+    "GR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo" +
+    "KCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAA" +
+    "AAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAA" +
+    "AAAAAAAAAAD/2gAMAwEAAhEDEQA/AKpAB//Z",
   "base64",
 );
 
@@ -90,6 +92,39 @@ describe("scanning", () => {
     await put("Alice/movie.mp4");
     await scan();
     expect((await db.select().from(performers)).map((p) => p.name)).toEqual(["Alice"]);
+  });
+
+  it("does not select performer artwork from meta folders", async () => {
+    const videoPath = await put("Alice/movie.mp4");
+    await putImage("Alice/meta/COVER.jpg");
+    await putImage("Alice/meta/banner.jpg");
+    await scan();
+    const [performer] = await db.select().from(performers);
+    expect(performer.imageFile).toBeNull();
+    expect(performer.bannerFile).toBeNull();
+    const [video] = await db.select({ thumbnailFile: mediaItems.thumbnailFile })
+      .from(mediaItems)
+      .innerJoin(mediaFiles, eq(mediaFiles.mediaItemId, mediaItems.id))
+      .where(eq(mediaFiles.path, videoPath));
+    expect(video.thumbnailFile).toBeNull();
+    await scan();
+    const [after] = await db.select().from(performers);
+    expect(after.imageFile).toBe(performer.imageFile);
+    expect(after.bannerFile).toBe(performer.bannerFile);
+  });
+
+  it("preserves stored performer artwork when meta images exist", async () => {
+    await put("Alice/movie.mp4");
+    await scan();
+    const [performer] = await db.select().from(performers);
+    await db.update(performers).set({ imageFile: "manual.jpg", bannerFile: "manual-banner.jpg" })
+      .where(eq(performers.id, performer.id));
+    await putImage("Alice/meta/cover.jpg");
+    await putImage("Alice/meta/banner.jpg");
+    await scan();
+    const [after] = await db.select().from(performers);
+    expect(after.imageFile).toBe("manual.jpg");
+    expect(after.bannerFile).toBe("manual-banner.jpg");
   });
 
   it("derives the studio from a studio sub-folder", async () => {
@@ -236,6 +271,40 @@ describe("scanning", () => {
       .where(eq(mediaFiles.path, path.join(root, "Alice/top.mp4")));
 
     expect(video.albumId).toBeNull();
+  });
+
+  it("does not select a video cover from its meta subfolder on rescan", async () => {
+    const videoPath = await put("Alice/Scene/scene.mp4");
+    await scan();
+    await putImage("Alice/Scene/meta/COVER.jpg");
+    await scan();
+
+    const [video] = await db
+      .select({ thumbnailFile: mediaItems.thumbnailFile, updatedAt: mediaItems.updatedAt })
+      .from(mediaItems)
+      .innerJoin(mediaFiles, eq(mediaFiles.mediaItemId, mediaItems.id))
+      .where(eq(mediaFiles.path, videoPath));
+    expect(video.thumbnailFile).toBeNull();
+
+    await scan();
+    const [after] = await db
+      .select({ thumbnailFile: mediaItems.thumbnailFile, updatedAt: mediaItems.updatedAt })
+      .from(mediaItems)
+      .innerJoin(mediaFiles, eq(mediaFiles.mediaItemId, mediaItems.id))
+      .where(eq(mediaFiles.path, videoPath));
+    expect(after).toEqual(video);
+  });
+
+  it("preserves a manually selected video thumbnail when a cover image exists", async () => {
+    const videoPath = await put("Alice/Scene/scene.mp4");
+    await scan();
+    const [file] = await db.select().from(mediaFiles).where(eq(mediaFiles.path, videoPath));
+    await db.update(mediaItems).set({ thumbnailFile: "manual.jpg" })
+      .where(eq(mediaItems.id, file.mediaItemId));
+    await putImage("Alice/Scene/Images/cover.jpg");
+    await scan();
+    const [video] = await db.select().from(mediaItems).where(eq(mediaItems.id, file.mediaItemId));
+    expect(video.thumbnailFile).toBe("manual.jpg");
   });
 
   // The original behaviour has to survive: where the photos sit beside the

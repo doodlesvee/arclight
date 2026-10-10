@@ -5,11 +5,21 @@
 # so Settings can show the URL to open on a phone. Harmless if it finds none.
 LAN := sh docker/with-lan-host.sh
 
-COMPOSE := docker compose -f docker/docker-compose.yml
+# Separate project names (-p) for prod and dev, so their containers, networks
+# and — critically — their named volumes never collide. Before this, both
+# used the default project name (the `docker` folder), so `down -v` in either
+# one tore down the *other's* database and app-data too.
+COMPOSE := docker compose -p media-server -f docker/docker-compose.yml
 
 # Development: the source folders are mounted into the containers and the app
 # reloads on edit.
-DEV := $(COMPOSE) -f docker/docker-compose.dev.yml
+DEV := docker compose -p media-server-dev -f docker/docker-compose.yml -f docker/docker-compose.dev.yml
+
+# Recomputed from package-lock.json so the dev node_modules volume is
+# replaced rather than silently reused when dependencies change — see
+# docker-compose.dev.yml. A stale copy here is what crashed Vite on
+# 2026-10-10 (vite and its bundled rolldown build ended up mismatched).
+export NODE_MODULES_TAG := $(shell shasum -a 256 package-lock.json | cut -c1-12)
 
 .DEFAULT_GOAL := help
 .PHONY: help up build down restart logs ps shell dev dev-down reset
@@ -39,7 +49,7 @@ shell: ## Open a shell inside the app container
 	$(COMPOSE) exec app sh
 
 dev: ## Start in development mode (live reload) on http://localhost:5173
-	$(LAN) $(DEV) up -d --build
+	$(LAN) $(DEV) up -d
 
 dev-down: ## Stop development mode
 	$(DEV) down --remove-orphans

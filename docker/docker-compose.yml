@@ -1,5 +1,16 @@
+# Caps log growth under Docker's default json-file driver, which otherwise
+# keeps every line forever — on a server left running for months, that's an
+# unbounded, unnoticed drain on disk. 3 files of 10MB loses nothing anyone
+# would still be reading; `docker compose logs` concatenates them all anyway.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   app:
+    logging: *default-logging
     build:
       context: ..
       dockerfile: apps/server/Dockerfile
@@ -34,9 +45,16 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     restart: unless-stopped
 
   postgres:
+    logging: *default-logging
     image: postgres:17-alpine
     # Deliberately not published to the host: the app reaches it over the
     # compose network, and a fixed host port 5432 collides with any Postgres

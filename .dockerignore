@@ -1,0 +1,27 @@
+# Build artifacts and installed deps must never enter the build context.
+#
+# Without this, `COPY apps/server apps/server` drags a stale host-built
+# `dist/` into the image. The Dockerfile then runs
+# `cp -r src/db/migrations dist/db/migrations`, and because dist/db/migrations
+# already exists, cp NESTS the fresh copy at dist/db/migrations/migrations/
+# instead of overwriting — so the app loads the stale migrations and a
+# superseded 0044 tried to recreate the `duels` table, crashing on boot.
+#
+# Host node_modules is also wrong arch (macOS vs the Linux image) and huge;
+# the image installs its own via `npm ci`.
+**/node_modules
+**/dist
+
+# Git metadata, local env, editor and OS cruft — no reason to ship them.
+.git
+.gitignore
+**/*.log
+.env
+.env.*
+.DS_Store
+.vscode
+.idea
+
+# Local-only app data and backups must never be baked into an image.
+app-data
+backups

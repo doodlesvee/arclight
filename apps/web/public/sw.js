@@ -1,100 +1,33 @@
 /**
- * The service worker, kept deliberately small.
+ * Self-destructing service worker.
  *
- * Its only job is to make the app installable, so it opens in its own window
- * without browser chrome — which is what §33's "PWA" is worth on a desktop
- * media library. Chrome requires a fetch handler before it will offer to
- * install, so there has to be one.
+ * The app used to register a worker to be installable; that feature was
+ * removed. A worker already installed in a browser does NOT go away on its
+ * own just because the registration code is gone — it keeps serving its
+ * cached shell, which is why a stopped server still appeared to "open".
  *
- * What it very deliberately does NOT do is cache anything from /api/. That
- * covers every media stream, thumbnail, preview and metadata response in the
- * app, and a cached copy is one that survives signing out and can be served
- * without the session cookie ever being checked — which is exactly what §29
- * forbids ("never expose media without authentication", "never expose
- * previews/thumbnails without authentication"). The Cache API is also not
- * cleared by the browser's own "clear site data" in every case, so artwork
- * put there could outlive a deliberate attempt to remove it.
+ * The browser re-fetches this script on its own update check (that fetch
+ * bypasses the old worker), sees it changed, installs this version, and on
+ * activation it unregisters itself, deletes every cache it made, and reloads
+ * any open tabs so they come straight from the network from then on.
  *
- * So: the built shell is precached, everything else goes to the network, and
- * an offline visit gets the shell rather than a dinosaur. An offline shell
- * with no library behind it is not much, but it is honest about why.
+ * Keep this file (don't delete it): deleting it makes /sw.js fall back to
+ * index.html, and the browser then can't complete the update that removes the
+ * old worker. This file can be deleted once you're sure no browser still has
+ * the old worker registered.
  */
-
-// Bumped whenever the shell changes shape. The build fingerprints its own
-// assets, so this only has to change when this file's own logic does.
-const CACHE = "media-server-shell-v2";
-
-const SHELL = ["/", "/index.html", "/favicon.svg", "/manifest.webmanifest"];
-
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches
-      .open(CACHE)
-      // Individually, and tolerantly: one 404 in this list would otherwise
-      // reject the whole install and leave the app with no worker at all.
-      .then((cache) =>
-        Promise.all(
-          SHELL.map((url) => cache.add(url).catch(() => undefined)),
-        ),
-      )
-      .then(() => self.skipWaiting()),
-  );
+self.addEventListener("install", () => {
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(
-          keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)),
-        ),
-      )
-      .then(() => self.clients.claim()),
-  );
-});
-
-self.addEventListener("fetch", (event) => {
-  const { request } = event;
-  const url = new URL(request.url);
-
-  // Everything that is not a plain GET of our own origin's static shell goes
-  // straight to the network, untouched and uncached. The /api/ check is the
-  // load-bearing one; the rest are belt and braces for the same rule.
-  if (
-    request.method !== "GET" ||
-    url.origin !== self.location.origin ||
-    url.pathname.startsWith("/api/")
-  ) {
-    return;
-  }
-
-  // A navigation falls back to the cached shell when the network is gone, so
-  // the app opens and can say so, rather than showing a browser error page.
-  if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request).catch(() =>
-        caches.match("/index.html").then((cached) => cached ?? Response.error()),
-      ),
-    );
-    return;
-  }
-
-  // Static assets: cache first, since the build fingerprints their names and
-  // a given URL's contents therefore never change.
-  event.respondWith(
-    caches.match(request).then(
-      (cached) =>
-        cached ??
-        fetch(request).then((response) => {
-          // Opaque and error responses are not worth storing, and storing an
-          // opaque one would hide a failure behind a cache hit next time.
-          if (response.ok && response.type === "basic") {
-            const copy = response.clone();
-            void caches.open(CACHE).then((cache) => cache.put(request, copy));
-          }
-          return response;
-        }),
-    ),
+    (async () => {
+      await self.registration.unregister();
+      const keys = await caches.keys();
+      await Promise.all(keys.map((key) => caches.delete(key)));
+      const clients = await self.clients.matchAll({ type: "window" });
+      for (const client of clients) client.navigate(client.url);
+    })(),
   );
 });

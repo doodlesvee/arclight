@@ -13,20 +13,23 @@ import { router } from "./router";
 const queryClient = new QueryClient();
 
 /**
- * Registers the service worker, so the app can be installed (§33).
+ * Tears down the old service worker.
  *
- * Production only. In dev the worker would sit in front of Vite's module
- * graph and serve a stale shell after every edit, which is a confusing way to
- * spend an afternoon.
- *
- * After load, so registering never competes with the first render for the
- * network. A failure is swallowed: an app that cannot be installed is a
- * missing convenience, not a broken library.
+ * The app used to register one to be installable; that's been removed. But a
+ * worker already registered in a browser keeps serving its cached shell long
+ * after the code that registered it is gone — which is why a stopped server
+ * still "opened" in the browser. This unregisters any such worker and clears
+ * its caches so the browser goes straight to the network again.
  */
-if (import.meta.env.PROD && "serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    void navigator.serviceWorker.register("/sw.js").catch(() => {});
+if ("serviceWorker" in navigator) {
+  void navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const registration of registrations) void registration.unregister();
   });
+  if ("caches" in window) {
+    void caches.keys().then((keys) => {
+      for (const key of keys) void caches.delete(key);
+    });
+  }
 }
 
 createRoot(document.getElementById("root")!).render(

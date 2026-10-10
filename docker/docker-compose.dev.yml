@@ -62,6 +62,14 @@ services:
       target: deps
     working_dir: /repo
     command: npm run dev --workspace apps/web
+    # YAML anchors don't cross files, so this repeats docker-compose.yml's
+    # x-logging block rather than reusing it — same reasoning: cap log growth
+    # under Docker's default json-file driver.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       PROXY_TARGET: http://app:3000
       # Vite does not read these by itself — apps/web/vite.config.ts turns
@@ -74,7 +82,17 @@ services:
       - ..:/repo
       - node_modules:/repo/node_modules
     depends_on:
-      - app
+      app:
+        condition: service_healthy
+    # So a Vite crash (like the sourcemapPathTransform/rolldown mismatch on
+    # 2026-10-10) recovers on its own instead of sitting dead until someone
+    # notices and runs `make dev` again.
+    restart: unless-stopped
 
 volumes:
+  # Named per dependency set (see NODE_MODULES_TAG in the Makefile) so a
+  # `package-lock.json` change gets a fresh volume instead of silently
+  # reusing one installed for older dependencies — that mismatch is what
+  # crashed Vite's dev server on 2026-10-10.
   node_modules:
+    name: node_modules-${NODE_MODULES_TAG:-default}

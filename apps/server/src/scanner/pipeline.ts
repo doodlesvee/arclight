@@ -726,6 +726,7 @@ async function assignAlbums(roots: { path: string }[]): Promise<void> {
         .set({ albumId: album.id })
         .where(inArray(mediaItems.id, needsLinking));
     }
+
   }
 }
 

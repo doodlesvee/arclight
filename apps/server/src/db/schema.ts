@@ -123,9 +123,6 @@ export const mediaItems = pgTable("media_items", {
   episodeTitle: text("episode_title"),
   hiddenAt: timestamp("hidden_at"),
   triagedAt: timestamp("triaged_at"),
-  // Retained for existing databases and backups after removing the Duels feature.
-  duelScore: integer("duel_score").notNull().default(1000),
-  duelCount: integer("duel_count").notNull().default(0),
   durationSeconds: integer("duration_seconds"),
   takenAt: timestamp("taken_at"),
   extraMetadata: jsonb("extra_metadata"),
@@ -475,28 +472,6 @@ export const watchLog = pgTable(
   (table) => [
     uniqueIndex("watch_log_item_hour_idx").on(table.mediaItemId, table.hour),
     index("watch_log_hour_idx").on(table.hour),
-  ],
-);
-
-// Historical records only; no routes read or write this table.
-export const duels = pgTable(
-  "duels",
-  {
-    id: serial("id").primaryKey(),
-    winnerId: integer("winner_id")
-      .notNull()
-      .references(() => mediaItems.id, { onDelete: "cascade" }),
-    loserId: integer("loser_id")
-      .notNull()
-      .references(() => mediaItems.id, { onDelete: "cascade" }),
-    /** Scores going in, so the latest duel can be undone exactly. */
-    winnerScoreBefore: integer("winner_score_before").notNull(),
-    loserScoreBefore: integer("loser_score_before").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => [
-    index("duels_winner_idx").on(table.winnerId),
-    index("duels_loser_idx").on(table.loserId),
   ],
 );
 
