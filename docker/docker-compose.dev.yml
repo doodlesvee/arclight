@@ -28,6 +28,13 @@ services:
     # to be the production build (whose WORKDIR is /app).
     working_dir: /repo
     command: npm run dev --workspace apps/server
+    # Clears the base file's host port publish (!reset drops the inherited
+    # list instead of appending to it). In dev, the only port a browser
+    # should open is 5173 (Vite, published below) — the web container
+    # reaches this one over the compose network (http://app:3000), not
+    # through a published host port. Without this, `make dev` would also
+    # expose 3000, landing you on the bare API with no HMR and no SPA.
+    ports: !reset []
     environment:
       # See the note at the top of this file. tsx bundles chokidar and reads
       # these directly.
